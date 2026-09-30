@@ -2,3 +2,4 @@
 out/
 dist/
 *.vsix
+.npm-cache/

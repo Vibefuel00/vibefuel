@@ -17,3 +17,5 @@ tsconfig.json
 .prettierignore
 **/*.map
 **/.DS_Store
+.gitignore
+docs/**
