@@ -1,0 +1,438 @@
+openapi: 3.1.0
+info:
+  title: Vibefuel Device API
+  version: 1.0.0
+  summary: Contract between the Vibefuel editor extension and the Vibefuel backend.
+  description: |
+    The extension authenticates a device with an OAuth-style device code flow,
+    then fetches sponsored messages, reports ad events in batches, reads the
+    token balance and links or unlinks a Solana public address.
+
+    The backend does not exist yet. The extension ships a mock adapter that
+    implements this same contract locally. Every request from the extension
+    carries `X-Vibefuel-Client` (editor name, editor version, extension version)
+    and, once authenticated, a bearer device token.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: "{baseUrl}"
+    description: Configured by the user via the `vibefuel.apiBaseUrl` setting.
+    variables:
+      baseUrl:
+        default: http://localhost:8787
+tags:
+  - name: auth
+  - name: ads
+  - name: events
+  - name: rewards
+  - name: wallet
+security:
+  - deviceToken: []
+paths:
+  /v1/auth/device:
+    post:
+      tags: [auth]
+      operationId: startDeviceAuth
+      summary: Start the device code flow.
+      description: Returns a device code to poll with and a short user code to show the developer.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceAuthRequest"
+      responses:
+        "200":
+          description: Device code issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceAuthResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/auth/token:
+    post:
+      tags: [auth]
+      operationId: pollDeviceToken
+      summary: Exchange a device code for a device token.
+      description: |
+        Poll at the interval returned by `startDeviceAuth`. While the developer
+        has not finished in the browser, the server answers `400` with error
+        `authorization_pending`. `slow_down` asks the client to add 5 seconds
+        to the polling interval. `expired_token` means the flow must restart.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceTokenRequest"
+      responses:
+        "200":
+          description: Device token issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceTokenResponse"
+        "400":
+          description: Not ready yet, or the device code is no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceTokenPending"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/ads/next:
+    get:
+      tags: [ads]
+      operationId: getNextAd
+      summary: Return the next eligible sponsored message for this device.
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: editor
+          in: query
+          required: false
+          description: Editor name, e.g. `vscode` or `cursor`. Used for targeting and nothing else.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An eligible ad.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ad"
+        "204":
+          description: No eligible ad right now. The client keeps its own frequency policy.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/events:
+    post:
+      tags: [events]
+      operationId: postEvents
+      summary: Report a batch of ad events.
+      description: |
+        The extension batches events and sends at most one request per minute.
+        Events are idempotent on `id`, so a retried batch never double counts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventBatch"
+      responses:
+        "202":
+          description: Batch accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventBatchResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/rewards/balance:
+    get:
+      tags: [rewards]
+      operationId: getBalance
+      summary: Return pending and settled token balances.
+      responses:
+        "200":
+          description: Current balances.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/wallet:
+    post:
+      tags: [wallet]
+      operationId: linkWallet
+      summary: Link a Solana public address to the account.
+      description: Only a public address is ever sent. Private keys and seed phrases never leave the developer's machine, and the extension never asks for them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletLinkRequest"
+      responses:
+        "200":
+          description: Address linked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        "400":
+          description: The address is not a valid Solana public key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [wallet]
+      operationId: unlinkWallet
+      summary: Unlink the Solana public address.
+      responses:
+        "204":
+          description: Address unlinked (or none was linked).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    deviceToken:
+      type: http
+      scheme: bearer
+      description: Device token issued by `POST /v1/auth/token`.
+  responses:
+    Unauthorized:
+      description: Missing, expired or revoked device token. The extension signs the device out.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Too many requests. Honor `Retry-After`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Error:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ClientInfo:
+      type: object
+      description: The only environment data the extension collects.
+      required: [editor, editor_version, extension_version]
+      properties:
+        editor:
+          type: string
+          description: Editor application name as reported by the editor, e.g. `Visual Studio Code` or `Cursor`.
+          maxLength: 80
+        editor_version:
+          type: string
+          maxLength: 40
+        extension_version:
+          type: string
+          maxLength: 40
+    DeviceAuthRequest:
+      type: object
+      required: [client]
+      properties:
+        client:
+          $ref: "#/components/schemas/ClientInfo"
+    DeviceAuthResponse:
+      type: object
+      required: [device_code, user_code, verification_uri, expires_in, interval]
+      properties:
+        device_code:
+          type: string
+          description: Opaque code the extension polls with. Never shown to the developer.
+        user_code:
+          type: string
+          description: Short human-readable code shown in the sidebar, e.g. `FUEL-4K7Q`.
+          maxLength: 16
+        verification_uri:
+          type: string
+          format: uri
+          description: Page where the developer enters the user code. Must be https.
+        verification_uri_complete:
+          type: string
+          format: uri
+          description: Optional variant with the user code pre-filled.
+        expires_in:
+          type: integer
+          description: Seconds until the device code expires.
+        interval:
+          type: integer
+          description: Minimum seconds between polls.
+    DeviceTokenRequest:
+      type: object
+      required: [device_code]
+      properties:
+        device_code:
+          type: string
+    DeviceTokenResponse:
+      type: object
+      required: [access_token, token_type, device_id]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          description: Seconds until the token expires. Omitted means it does not expire.
+        device_id:
+          type: string
+          description: Anonymous device id assigned by the server.
+    DeviceTokenPending:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [authorization_pending, slow_down, expired_token, access_denied]
+        error_description:
+          type: string
+    Ad:
+      type: object
+      description: One sponsored message. Rendered only inside the Vibefuel sidebar view.
+      required:
+        [
+          id,
+          advertiser,
+          headline,
+          body,
+          cta_label,
+          cta_url,
+          reward_tokens,
+          expires_at,
+        ]
+      properties:
+        id:
+          type: string
+        advertiser:
+          type: string
+          maxLength: 40
+        headline:
+          type: string
+          maxLength: 60
+        body:
+          type: string
+          maxLength: 140
+        cta_label:
+          type: string
+          maxLength: 20
+        cta_url:
+          type: string
+          format: uri
+          pattern: "^https://"
+          description: Opened in the external browser when the developer clicks the CTA. Never auto-opened.
+        image_url:
+          type: string
+          format: uri
+          pattern: "^https://"
+          description: Optional 16:9 image.
+        reward_tokens:
+          type: number
+          minimum: 0
+          description: Tokens credited on a qualified impression.
+        expires_at:
+          type: string
+          format: date-time
+    AdEventType:
+      type: string
+      enum: [impression, click, dismiss]
+    AdEvent:
+      type: object
+      required: [id, ad_id, type, occurred_at, session_id]
+      properties:
+        id:
+          type: string
+          description: Client-generated UUID used for idempotency.
+        ad_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/AdEventType"
+        occurred_at:
+          type: string
+          format: date-time
+        session_id:
+          type: string
+          description: Random id for the current editor session. Rotates every time the editor starts.
+    EventBatch:
+      type: object
+      required: [events, client]
+      properties:
+        events:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/AdEvent"
+        client:
+          $ref: "#/components/schemas/ClientInfo"
+    EventBatchResult:
+      type: object
+      required: [accepted]
+      properties:
+        accepted:
+          type: integer
+          description: Number of events accepted, including duplicates that were ignored.
+        balance:
+          $ref: "#/components/schemas/Balance"
+    Balance:
+      type: object
+      required: [pending, settled, currency]
+      properties:
+        pending:
+          type: number
+          description: Tokens credited but not yet settled on-chain.
+        settled:
+          type: number
+          description: Tokens settled to the linked wallet, or held until one is linked.
+        currency:
+          type: string
+          description: Token symbol.
+        updated_at:
+          type: string
+          format: date-time
+    WalletLinkRequest:
+      type: object
+      required: [address]
+      properties:
+        address:
+          type: string
+          description: Base58 Solana public key (32 bytes).
+          minLength: 32
+          maxLength: 44
+    Wallet:
+      type: object
+      required: [address, linked_at]
+      properties:
+        address:
+          type: string
+        linked_at:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
