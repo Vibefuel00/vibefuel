@@ -1,0 +1,55 @@
+[
+  {
+    "id": "mock-001",
+    "advertiser": "Quillstack Labs",
+    "headline": "Ship docs that stay in sync with your code",
+    "body": "Quillstack watches your repo and drafts reference docs on every merge. Fictional product for Vibefuel mock mode.",
+    "cta_label": "Try Quillstack",
+    "cta_url": "https://example.com/quillstack",
+    "image_url": "https://placehold.co/640x360/F4EBE3/EA580C.png?text=Quillstack",
+    "reward_tokens": 12,
+    "expires_at": "2099-01-01T00:00:00Z"
+  },
+  {
+    "id": "mock-002",
+    "advertiser": "Orbital Cache",
+    "headline": "A CDN that speaks your build tool's language",
+    "body": "Edge caching with zero config for Vite, Next and Bun. Fictional product for Vibefuel mock mode.",
+    "cta_label": "See pricing",
+    "cta_url": "https://example.com/orbital-cache",
+    "reward_tokens": 8,
+    "expires_at": "2099-01-01T00:00:00Z"
+  },
+  {
+    "id": "mock-003",
+    "advertiser": "Pinecone & Pixel",
+    "headline": "Mechanical keyboards tuned for long sessions",
+    "body": "Quiet switches, low-profile keys and a wrist rest that ships in the box. Fictional shop for Vibefuel mock mode.",
+    "cta_label": "Shop keyboards",
+    "cta_url": "https://example.com/pinecone-pixel",
+    "image_url": "https://placehold.co/640x360/F4EBE3/000000.png?text=Pinecone+%26+Pixel",
+    "reward_tokens": 10,
+    "expires_at": "2099-01-01T00:00:00Z"
+  },
+  {
+    "id": "mock-004",
+    "advertiser": "Ledgerline",
+    "headline": "Invoices for freelance developers, done in 60 seconds",
+    "body": "Track hours from your editor and send invoices in three currencies. Fictional product for Vibefuel mock mode.",
+    "cta_label": "Start free",
+    "cta_url": "https://example.com/ledgerline",
+    "reward_tokens": 15,
+    "expires_at": "2099-01-01T00:00:00Z"
+  },
+  {
+    "id": "mock-005",
+    "advertiser": "Nimbus Notebook",
+    "headline": "Run your data notebooks on a GPU by the minute",
+    "body": "Pay only while a cell is running. Spin up, train, tear down. Fictional product for Vibefuel mock mode.",
+    "cta_label": "Get 2 free hours",
+    "cta_url": "https://example.com/nimbus-notebook",
+    "image_url": "https://placehold.co/640x360/EA580C/F4EBE3.png?text=Nimbus",
+    "reward_tokens": 20,
+    "expires_at": "2099-01-01T00:00:00Z"
+  }
+]
