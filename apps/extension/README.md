@@ -108,8 +108,8 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
   events are sent at all. The sidebar tells you that views cannot be rewarded.
 - Only a Solana public address is stored, in the editor's SecretStorage. You can
   unlink it at any time.
-- In mock mode nothing leaves your machine. Events are written to the
-  **Vibefuel** output channel.
+- In mock mode no events or ids are sent anywhere; they are written to the
+  **Vibefuel** output channel. Card images still load from their https URL.
 
 ## Mock mode and the API contract
 

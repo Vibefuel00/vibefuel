@@ -172,7 +172,7 @@
           className: "small muted",
           text:
             s.mode === "mock"
-              ? "Mock mode: a local device id is generated, nothing leaves your machine."
+              ? "Mock mode: a local device id is generated and no events are sent anywhere."
               : "Sign in with a short code in your browser. No password is typed in the editor.",
         }),
         button("Sign in", () => post({ type: "signIn" }), "primary")

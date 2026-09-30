@@ -65,6 +65,7 @@ export class Controller implements vscode.Disposable {
   private authPoll: NodeJS.Timeout | null = null
   private tick: NodeJS.Timeout | null = null
   private nextFetchNotBefore = 0
+  private nextAuthRetryAt = 0
   private lastDecision: PolicyDecision = {
     allowed: false,
     reason: "disabled",
@@ -451,6 +452,15 @@ export class Controller implements vscode.Disposable {
     )
   }
 
+  /** After an offline failure, retry sign-in quietly every few minutes. */
+  private async retrySignInIfOffline(): Promise<void> {
+    if (!this.config.enabled || this.signedIn || this.authPoll) return
+    if (this.authView?.status !== "error") return
+    if (Date.now() < this.nextAuthRetryAt) return
+    this.nextAuthRetryAt = Date.now() + FETCH_BACKOFF_MS
+    await this.ensureSignedIn(true)
+  }
+
   private stopAuthPolling(): void {
     if (this.authPoll) {
       clearTimeout(this.authPoll)
@@ -491,6 +501,7 @@ export class Controller implements vscode.Disposable {
 
   private async onTick(): Promise<void> {
     this.evaluate()
+    await this.retrySignInIfOffline()
     if (!this.lastDecision.allowed) return
     if (Date.now() < this.nextFetchNotBefore) return
     await this.fetchNextAd()
