@@ -1,0 +1,207 @@
+{
+  "name": "vibefuel",
+  "displayName": "Vibefuel",
+  "description": "See sponsored messages in your coding workflow and earn Solana tokens toward your next AI credits.",
+  "version": "0.1.0",
+  "publisher": "vibefuel",
+  "license": "MIT",
+  "private": true,
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#F4EBE3",
+    "theme": "light"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KhepriDev/code-earn.git",
+    "directory": "apps/extension"
+  },
+  "bugs": {
+    "url": "https://github.com/KhepriDev/code-earn/issues"
+  },
+  "homepage": "https://github.com/KhepriDev/code-earn/tree/main/apps/extension#readme",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=20.9.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "vibefuel",
+    "solana",
+    "rewards",
+    "sponsored",
+    "ai coding"
+  ],
+  "pricing": "Free",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vibefuel",
+          "title": "Vibefuel",
+          "icon": "media/activity-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "vibefuel": [
+        {
+          "type": "webview",
+          "id": "vibefuel.feed",
+          "name": "Feed",
+          "icon": "media/activity-icon.svg",
+          "contextualTitle": "Vibefuel"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vibefuel.openFeed",
+        "title": "Open Feed",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.pause",
+        "title": "Pause",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.resume",
+        "title": "Resume",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.linkWallet",
+        "title": "Link Solana Wallet Address",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.unlinkWallet",
+        "title": "Unlink Wallet Address",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.signOut",
+        "title": "Sign Out",
+        "category": "Vibefuel"
+      },
+      {
+        "command": "vibefuel.openLandingPage",
+        "title": "Open Vibefuel Website",
+        "category": "Vibefuel"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "vibefuel.pause",
+          "when": "vibefuel.enabled && !vibefuel.paused"
+        },
+        {
+          "command": "vibefuel.resume",
+          "when": "vibefuel.enabled && vibefuel.paused"
+        },
+        {
+          "command": "vibefuel.linkWallet",
+          "when": "vibefuel.enabled"
+        },
+        {
+          "command": "vibefuel.unlinkWallet",
+          "when": "vibefuel.enabled && vibefuel.walletLinked"
+        },
+        {
+          "command": "vibefuel.signOut",
+          "when": "vibefuel.enabled"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Vibefuel",
+      "properties": {
+        "vibefuel.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show sponsored messages in the Vibefuel sidebar and earn tokens. Off until you opt in from the Vibefuel view."
+        },
+        "vibefuel.frequencyMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 15,
+          "description": "Minimum minutes between new sponsored messages."
+        },
+        "vibefuel.quietPeriodMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "description": "Minutes after the editor starts before the first sponsored message can appear."
+        },
+        "vibefuel.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Vibefuel token balance in the status bar."
+        },
+        "vibefuel.apiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the Vibefuel API. Leave empty to run in mock mode with local fictional ads."
+        },
+        "vibefuel.telemetry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send ad events (impression, click, dismiss) so impressions can be rewarded. Always off when editor telemetry is disabled."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/integration/tsconfig.json",
+    "lint": "eslint src test",
+    "format": "prettier --write \"**/*.{ts,mjs,js,json,css,md,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,mjs,js,json,css,md,yaml}\"",
+    "generate:api": "openapi-typescript api/openapi.yaml -o src/api/generated/openapi.d.ts",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:integration": "npm run build && tsc -p test/integration/tsconfig.json && node out/test/integration/runTest.js",
+    "icon": "python3 scripts/make-icon.py",
+    "package": "npm run build && vsce package --no-dependencies --out dist/",
+    "publish:vscode": "vsce publish --no-dependencies",
+    "publish:openvsx": "ovsx publish dist/*.vsix"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10",
+    "eslint-config-prettier": "^10.1.8",
+    "glob": "^11.0.0",
+    "mocha": "^12.0.2",
+    "openapi-typescript": "^7.13.0",
+    "ovsx": "^1.2.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}
