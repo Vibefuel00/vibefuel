@@ -25,11 +25,11 @@ Optionally, your balance shows in the status line: `⛽ 128 FUEL · ● new`.
 ## Install
 
 ```
-claude plugin marketplace add vibefuel/vibefuel-claude-code
+claude plugin marketplace add Vibefuel00/vibefuel-claude-code
 claude plugin install vibefuel@vibefuel
 ```
 
-Or from inside a session: `/plugin install vibefuel --marketplace vibefuel/vibefuel-claude-code`.
+Or from inside a session: `/plugin install vibefuel --marketplace Vibefuel00/vibefuel-claude-code`.
 
 Then opt in and sign in with a free serial key from
 [vibefuel.app/start](https://vibefuel.app/start). Nothing runs before this:
@@ -115,7 +115,7 @@ The shared client code (contract, adapters, policy, validation) lives in
 The plugin is published from its own repository, generated from this folder:
 
 ```bash
-node scripts/export.mjs ../../../vibefuel-claude-code --repo vibefuel/vibefuel-claude-code
+node scripts/export.mjs ../../../vibefuel-claude-code --repo Vibefuel00/vibefuel-claude-code
 cd ../../../vibefuel-claude-code && git add -A && git commit -m "vibefuel 0.1.0" && git push
 ```
 

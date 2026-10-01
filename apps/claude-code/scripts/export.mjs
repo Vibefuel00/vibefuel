@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const pluginRoot = path.resolve(here, "..")
-const DEFAULT_REPO = "vibefuel/vibefuel-claude-code"
+const DEFAULT_REPO = "Vibefuel00/vibefuel-claude-code"
 
 const args = process.argv.slice(2)
 const repoFlag = args.indexOf("--repo")

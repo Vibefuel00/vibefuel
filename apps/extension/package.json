@@ -12,7 +12,7 @@
     "theme": "light"
   },
   "bugs": {
-    "url": "https://vibefuel.app"
+    "url": "https://github.com/Vibefuel00/vibefuel/issues"
   },
   "homepage": "https://vibefuel.app",
   "engines": {
@@ -206,5 +206,10 @@
     "typescript": "^5",
     "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vibefuel00/vibefuel.git",
+    "directory": "apps/extension"
   }
 }

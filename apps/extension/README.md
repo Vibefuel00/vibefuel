@@ -111,7 +111,7 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
   anywhere; they are written to the **Vibefuel** output channel. Card images
   still load from their https URL.
 - The full summary is at [vibefuel.app/privacy](https://vibefuel.app/privacy).
-- Source code: the Vibefuel repository is linked from the website.
+- Source code: https://github.com/Vibefuel00/vibefuel
 
 ## Mock mode and the API contract
 
@@ -152,4 +152,4 @@ npx ovsx publish dist/*.vsix -p $OVSX_PAT   # Open VSX, used by Cursor
 
 ## License
 
-MIT License. The full text ships inside the extension package.
+MIT. See [LICENSE](LICENSE).

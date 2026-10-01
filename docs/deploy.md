@@ -46,11 +46,11 @@ be live before users can sign in.
 
 ```bash
 cd apps/claude-code
-npm run export -- ../../../vibefuel-claude-code --repo vibefuel/vibefuel-claude-code
+npm run export -- ../../../vibefuel-claude-code --repo Vibefuel00/vibefuel-claude-code
 cd ../../../vibefuel-claude-code && git add -A && git commit -m "vibefuel <version>" && git push
 ```
 
-Users install with `claude plugin marketplace add vibefuel/vibefuel-claude-code`
+Users install with `claude plugin marketplace add Vibefuel00/vibefuel-claude-code`
 then `claude plugin install vibefuel@vibefuel`.
 
 ## Release checklist
