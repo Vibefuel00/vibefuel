@@ -8,6 +8,13 @@ import { HeroDemo } from "@/components/hero-demo"
 import { Reveal } from "@/components/reveal"
 import { SiteHeader, type Role } from "@/components/site-header"
 import { BUILDER } from "@/lib/site"
+import { LINKS } from "@/lib/links"
+import {
+  ClaudeLogo,
+  CursorLogo,
+  GitHubLogo,
+  VSCodeLogo,
+} from "@/components/tool-logos"
 
 type HeroCopy = {
   headline: readonly string[]
@@ -66,7 +73,22 @@ const SECONDARY_HREF: Record<Role, string> = {
   advertiser: "/",
 }
 
-function HeroCopyBlock({ role, active, onStart }: { role: Role; active: boolean; onStart: () => void }) {
+const INSTALLS = [
+  { label: "VS Code", href: LINKS.marketplace, Logo: VSCodeLogo },
+  { label: "Cursor", href: LINKS.openVsx, Logo: CursorLogo },
+  { label: "Claude Code", href: LINKS.claudeCodeRepo, Logo: ClaudeLogo },
+  { label: "GitHub", href: LINKS.sourceRepo, Logo: GitHubLogo },
+] as const
+
+function HeroCopyBlock({
+  role,
+  active,
+  onStart,
+}: {
+  role: Role
+  active: boolean
+  onStart: () => void
+}) {
   const copy = COPY[role]
   return (
     <div
@@ -88,13 +110,36 @@ function HeroCopyBlock({ role, active, onStart }: { role: Role; active: boolean;
         {copy.caption}
         <span className="hero-credit">
           · Built on Solana by{" "}
-          <a href={BUILDER.url} target="_blank" rel="noopener" className="hero-builder" tabIndex={active ? 0 : -1}>
+          <a
+            href={BUILDER.url}
+            target="_blank"
+            rel="noopener"
+            className="hero-builder"
+            tabIndex={active ? 0 : -1}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- small avatar served from /public */}
-            <img src={BUILDER.avatar} alt="" width="18" height="18" />
-            @{BUILDER.handle}
+            <img src={BUILDER.avatar} alt="" width="18" height="18" />@
+            {BUILDER.handle}
           </a>
         </span>
       </p>
+      {role === "developer" && (
+        <div className="hero-installs" aria-label="Install Vibefuel">
+          {INSTALLS.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              className="install-chip"
+              target="_blank"
+              rel="noopener"
+              tabIndex={active ? 0 : -1}
+            >
+              <item.Logo className="install-chip-logo" />
+              {item.label}
+            </a>
+          ))}
+        </div>
+      )}
       <div className="hero-actions">
         {role === "developer" ? (
           <button
@@ -157,7 +202,8 @@ export function Landing() {
 
   function closeStart() {
     setStartOpen(false)
-    if (window.location.hash === "#start") window.history.replaceState(null, "", window.location.pathname)
+    if (window.location.hash === "#start")
+      window.history.replaceState(null, "", window.location.pathname)
   }
 
   return (

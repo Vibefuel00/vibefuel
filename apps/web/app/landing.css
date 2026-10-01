@@ -5,27 +5,27 @@
 /* ------------------------------------------------------------------ */
 
 @font-face {
-  font-family: 'Kalam:Bold';
+  font-family: "Kalam:Bold";
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('https://static.figma.com/font/Kalam-Bold_1') format('woff2');
+  src: url("https://static.figma.com/font/Kalam-Bold_1") format("woff2");
 }
 
 @font-face {
-  font-family: 'Geist:SemiBold';
+  font-family: "Geist:SemiBold";
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+  src: url("https://static.figma.com/font/Geist_wght__1") format("woff2");
 }
 
 @font-face {
-  font-family: 'Geist:Medium';
+  font-family: "Geist:Medium";
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+  src: url("https://static.figma.com/font/Geist_wght__1") format("woff2");
 }
 
 :root {
@@ -33,9 +33,10 @@
   --ink: #000;
   --muted: #616161;
   --accent: #ea580c;
-  --font-eyebrow: 'Kalam:Bold', 'Kalam', cursive;
-  --font-heading: 'Geist:SemiBold', var(--font-sans), 'Geist', system-ui, sans-serif;
-  --font-body: 'Geist:Medium', var(--font-sans), 'Geist', system-ui, sans-serif;
+  --font-eyebrow: "Kalam:Bold", "Kalam", cursive;
+  --font-heading:
+    "Geist:SemiBold", var(--font-sans), "Geist", system-ui, sans-serif;
+  --font-body: "Geist:Medium", var(--font-sans), "Geist", system-ui, sans-serif;
 }
 
 /* Canvas ----------------------------------------------------------- */
@@ -242,6 +243,54 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+/* Install chips: one per tool, above the main actions. */
+.hero-installs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.install-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.45);
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.1px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.install-chip:hover {
+  border-color: var(--ink);
+  background-color: #fff;
+  transform: translateY(-1px);
+}
+
+.install-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.install-chip-logo {
+  width: 15px;
+  height: 15px;
+  flex: none;
 }
 
 .hero-aside {
@@ -1040,11 +1089,21 @@ a.ad-headline:hover {
   border-radius: 4px;
 }
 
-.tone-k { background-color: #c78bff; }
-.tone-n { background-color: #6e6a66; }
-.tone-p { background-color: #4a4744; }
-.tone-s { background-color: #9dc98a; }
-.tone-c { background-color: #3a3835; }
+.tone-k {
+  background-color: #c78bff;
+}
+.tone-n {
+  background-color: #6e6a66;
+}
+.tone-p {
+  background-color: #4a4744;
+}
+.tone-s {
+  background-color: #9dc98a;
+}
+.tone-c {
+  background-color: #3a3835;
+}
 
 .mock-statusbar {
   display: flex;
