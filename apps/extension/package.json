@@ -19,7 +19,7 @@
   "bugs": {
     "url": "https://github.com/KhepriDev/code-earn/issues"
   },
-  "homepage": "https://github.com/KhepriDev/code-earn/tree/main/apps/extension#readme",
+  "homepage": "https://vibefuel.app",
   "engines": {
     "vscode": "^1.90.0",
     "node": ">=20.9.0"
