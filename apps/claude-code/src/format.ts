@@ -46,9 +46,9 @@ export function formatWait(untilMs: number, now: number): string {
 export const PRIVACY_SUMMARY = `Vibefuel privacy summary (terminal plugin)
 
 Collected
-  - An anonymous device id
-  - Ad events: impression, click, dismiss, with ad id, timestamp and a per-session id
-  - Client name and version (Claude Code) and the plugin version
+  - Your serial key, stored hashed on the server, to tie events to your dashboard
+  - Ad events: impression, click, dismiss, with campaign id, timestamp and a per-session id
+  - Client name (Claude Code) and the plugin version. No active time is reported from the terminal
 
 Never collected
   - File contents, file names, project names or paths
@@ -62,4 +62,5 @@ Rules
   - Links are tracked by a redirect, so a click can be rewarded without any script in your terminal.
   - At most one sponsored line per 30 minutes, none in the first 10 minutes of a session, never mid-task, never inside subagents.
   - /vibefuel:optout deletes ~/.vibefuel entirely.
-  - In mock mode (no API URL set) nothing is sent anywhere; events go to ~/.vibefuel/log.txt.`
+  - In mock mode (/vibefuel:config api mock) nothing is sent anywhere; events go to ~/.vibefuel/log.txt.
+  - Full summary: https://vibefuel.app/privacy`

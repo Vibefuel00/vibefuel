@@ -7,7 +7,6 @@ import {
   type PolicyDecision,
   type VibefuelApi,
 } from "@workspace/vibefuel-core"
-import { poll } from "./auth"
 import { formatSponsoredLine } from "./format"
 import type { StateStore } from "./state"
 
@@ -97,12 +96,7 @@ export async function onStop(
     const state = store.load()
     if (!state.optedIn) return {}
 
-    // Finish a pending sign-in quietly if the user approved it in the browser.
-    if (!store.getToken() && state.pendingAuth) {
-      if (state.pendingAuth.expires_at > now)
-        await poll(store, api, state.pendingAuth)
-      else store.update((s) => void (s.pendingAuth = null))
-    }
+    if (!store.getToken()) return {}
 
     const { decision } = decide(sessionId, ctx)
     if (!decision.allowed) return {}
@@ -150,6 +144,20 @@ export async function onStop(
       }
     } catch (error) {
       store.log(`Could not report impression: ${describe(error)}`)
+    }
+
+    // Let the dashboard show "connected via Claude Code"; no active time is claimed.
+    try {
+      await api.heartbeat(0)
+    } catch {
+      // Best effort only.
+    }
+
+    // Lets the dashboard show "connected via Claude Code"; no active time is claimed.
+    try {
+      await api.heartbeat(0)
+    } catch {
+      // Best effort only.
     }
 
     return { systemMessage: formatSponsoredLine(ad) }

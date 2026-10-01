@@ -3,25 +3,17 @@ import * as os from "node:os"
 import * as path from "node:path"
 import type { Balance } from "@workspace/vibefuel-core"
 
-export interface PendingAuth {
-  device_code: string
-  user_code: string
-  verification_uri: string
-  expires_at: number
-  interval_ms: number
-}
-
 /** Everything Vibefuel keeps for the terminal plugin. Lives in ~/.vibefuel. */
 export interface VibefuelState {
   optedIn: boolean
   paused: boolean
-  deviceId: string | null
+  keyPrefix: string | null
   walletAddress: string | null
   lastDeliveredAt: number | null
   /** Session id → start time, used for the quiet period. Pruned after a day. */
   sessions: Record<string, number>
   balance: Balance | null
-  pendingAuth: PendingAuth | null
+  /** "" = default (vibefuel.app), "mock" = offline mock mode, or a custom host. */
   apiBaseUrl: string
   frequencyMinutes: number
   quietPeriodMinutes: number
@@ -39,12 +31,11 @@ export interface VibefuelState {
 export const DEFAULT_STATE: VibefuelState = {
   optedIn: false,
   paused: false,
-  deviceId: null,
+  keyPrefix: null,
   walletAddress: null,
   lastDeliveredAt: null,
   sessions: {},
   balance: null,
-  pendingAuth: null,
   apiBaseUrl: "",
   frequencyMinutes: 30,
   quietPeriodMinutes: 10,

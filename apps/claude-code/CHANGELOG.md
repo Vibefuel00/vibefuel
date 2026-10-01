@@ -11,5 +11,5 @@
 - Commands: optin, optout, login, status, pause, resume, wallet, config,
   statusline, privacy.
 - Status line script showing the token balance and a marker for a new line.
-- Device code sign-in against the shared OpenAPI contract, with mock mode by
-  default. State in `~/.vibefuel` with owner-only permissions.
+- Serial-key sign-in against the shared OpenAPI contract served by vibefuel.app,
+  with an offline mock mode. State in `~/.vibefuel` with owner-only permissions.

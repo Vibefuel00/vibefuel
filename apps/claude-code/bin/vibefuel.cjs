@@ -34,7 +34,7 @@ var ApiUnavailableError = class extends Error {
 };
 var UnauthorizedError = class extends Error {
   constructor() {
-    super("Device token rejected");
+    super("Serial key rejected");
     this.name = "UnauthorizedError";
   }
 };
@@ -107,6 +107,15 @@ function isHttpsUrl(value) {
     return false;
   }
 }
+function isHttpUrl(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
 function validateAd(input, now = Date.now()) {
   if (!input || typeof input !== "object") return null;
   const ad = input;
@@ -125,7 +134,11 @@ function validateAd(input, now = Date.now()) {
   if (!id || !advertiser || !headline || !body || !cta_label) return null;
   if (!isHttpsUrl(ad.cta_url)) return null;
   if (ad.image_url !== void 0 && !isHttpsUrl(ad.image_url)) return null;
-  if (ad.click_url !== void 0 && !isHttpsUrl(ad.click_url)) return null;
+  if (ad.click_url !== void 0 && !isHttpUrl(ad.click_url)) return null;
+  if (ad.logo_url !== void 0 && !isHttpsUrl(ad.logo_url)) return null;
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const hex = (key) => typeof ad[key] === "string" && HEX.test(ad[key]) ? ad[key].toLowerCase() : void 0;
+  const domain = typeof ad.domain === "string" && ad.domain.trim().length > 0 && ad.domain.length <= 80 ? ad.domain.trim() : void 0;
   const reward = ad.reward_tokens;
   if (typeof reward !== "number" || !Number.isFinite(reward) || reward < 0) {
     return null;
@@ -145,6 +158,12 @@ function validateAd(input, now = Date.now()) {
   };
   if (ad.image_url !== void 0) result.image_url = ad.image_url;
   if (ad.click_url !== void 0) result.click_url = ad.click_url;
+  if (ad.logo_url !== void 0) result.logo_url = ad.logo_url;
+  const brand_bg = hex("brand_bg");
+  const brand_fg = hex("brand_fg");
+  if (brand_bg) result.brand_bg = brand_bg;
+  if (brand_fg) result.brand_fg = brand_fg;
+  if (domain) result.domain = domain;
   return result;
 }
 
@@ -199,6 +218,27 @@ function shortenAddress(address) {
   return `${address.slice(0, 4)}\u2026${address.slice(-4)}`;
 }
 
+// ../../packages/vibefuel-core/src/key.ts
+var KEY_RE = /^VF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+function normalizeSerialKey(input) {
+  return input.trim().toUpperCase().replace(/\s+/g, "");
+}
+function isSerialKeyShape(key) {
+  return KEY_RE.test(key);
+}
+function validateSerialKey(input) {
+  const key = normalizeSerialKey(input);
+  if (key.length === 0)
+    return { ok: false, message: "Paste your Vibefuel key." };
+  if (!isSerialKeyShape(key)) {
+    return {
+      ok: false,
+      message: "That doesn't look like a Vibefuel key (VF-XXXX-XXXX-XXXX-XXXX)."
+    };
+  }
+  return { ok: true, key };
+}
+
 // ../../packages/vibefuel-core/src/http.ts
 var HttpAdapter = class {
   mode = "http";
@@ -214,66 +254,53 @@ var HttpAdapter = class {
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? HTTP_TIMEOUT_MS;
   }
-  async startDeviceAuth() {
-    const res = await this.request("POST", "/v1/auth/device", {
-      body: { client: this.client },
-      auth: false
-    });
+  async me() {
+    const res = await this.request("GET", "/api/ext/me");
     return await res.json();
   }
-  async pollDeviceToken(deviceCode) {
-    const res = await this.request("POST", "/v1/auth/token", {
-      body: { device_code: deviceCode },
-      auth: false,
-      allow: [400]
+  async heartbeat(activeSeconds) {
+    await this.request("POST", "/api/ext/heartbeat", {
+      body: {
+        editor: this.client.editor,
+        extension_version: this.client.extension_version,
+        active_seconds: Math.max(0, Math.min(600, Math.floor(activeSeconds)))
+      }
     });
-    if (res.status === 400) {
-      const pending = await res.json();
-      return { status: "pending", error: pending.error };
-    }
-    return { status: "ok", token: await res.json() };
   }
   async getNextAd(sessionId) {
-    const query = new URLSearchParams({
-      session_id: sessionId,
-      editor: this.client.editor
-    });
-    const res = await this.request("GET", `/v1/ads/next?${query.toString()}`);
+    const query = new URLSearchParams({ session_id: sessionId });
+    if (this.client.surface) query.set("surface", this.client.surface);
+    const res = await this.request(
+      "GET",
+      `/api/ext/ads/next?${query.toString()}`
+    );
     if (res.status === 204) return null;
     return await res.json();
   }
   async postEvents(events) {
-    const res = await this.request("POST", "/v1/events", {
+    const res = await this.request("POST", "/api/ext/events", {
       body: { events, client: this.client }
     });
     return await res.json();
   }
-  async getBalance() {
-    const res = await this.request("GET", "/v1/rewards/balance");
-    return await res.json();
-  }
   async linkWallet(address) {
-    const res = await this.request("POST", "/v1/wallet", {
+    const res = await this.request("POST", "/api/ext/wallet", {
       body: { address }
     });
     return await res.json();
   }
   async unlinkWallet() {
-    await this.request("DELETE", "/v1/wallet");
+    await this.request("DELETE", "/api/ext/wallet");
   }
   async request(method, path2, options = {}) {
     const headers = {
       Accept: "application/json",
       "X-Vibefuel-Client": `${this.client.editor}/${this.client.editor_version} vibefuel/${this.client.extension_version}`
     };
-    if (options.body !== void 0) {
-      headers["Content-Type"] = "application/json";
-    }
-    if (options.auth !== false) {
-      const token = await this.tokens.getToken();
-      if (!token) throw new UnauthorizedError();
-      headers.Authorization = `Bearer ${token}`;
-    }
+    if (options.body !== void 0) headers["Content-Type"] = "application/json";
+    const token = await this.tokens.getToken();
+    if (!token) throw new UnauthorizedError();
+    headers.Authorization = `Bearer ${token}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res;
@@ -296,7 +323,7 @@ var HttpAdapter = class {
     try {
       const body = await res.json();
       code = body.error ?? code;
-      message = body.message ?? message;
+      message = body.message ?? body.error ?? message;
     } catch {
     }
     throw new ApiRequestError(res.status, code, message);
@@ -304,15 +331,17 @@ var HttpAdapter = class {
 };
 
 // ../../packages/vibefuel-core/src/mock.ts
-var import_node_crypto = require("node:crypto");
 var KEY_INDEX = "mock.adIndex";
 var KEY_CREDITS = "mock.credits";
-var KEY_SETTLED = "mock.settled";
+var KEY_PAID = "mock.paid";
 var KEY_SEEN_EVENTS = "mock.seenEvents";
 var KEY_WALLET = "mock.wallet";
-var KEY_DEVICE_ID = "mock.deviceId";
-var SETTLE_AFTER_MS = 10 * 6e4;
-var CURRENCY = "FUEL";
+var KEY_ACTIVE = "mock.activeSeconds";
+var KEY_LAST_REWARD = "mock.lastReward";
+var REWARD_COOLDOWN_MS = 6 * 60 * 6e4;
+var PAYOUT_AFTER_MS = 10 * 6e4;
+var CURRENCY = "tokens";
+var MOCK_KEY_PREFIX = "VF-MOCK";
 var MockAdapter = class {
   constructor(ads, storage, log, now = () => Date.now()) {
     this.ads = ads;
@@ -325,31 +354,24 @@ var MockAdapter = class {
   log;
   now;
   mode = "mock";
-  startDeviceAuth() {
-    this.log.appendLine("[mock] device auth started (auto-approved locally)");
-    return Promise.resolve({
-      device_code: `mock-${(0, import_node_crypto.randomUUID)()}`,
-      user_code: "MOCK-MODE",
-      verification_uri: "https://localhost/mock-verification",
-      expires_in: 600,
-      interval: 1
-    });
-  }
-  async pollDeviceToken(deviceCode) {
-    let deviceId = this.storage.get(KEY_DEVICE_ID);
-    if (!deviceId) {
-      deviceId = (0, import_node_crypto.randomUUID)();
-      await this.storage.update(KEY_DEVICE_ID, deviceId);
-    }
-    this.log.appendLine(`[mock] token issued for ${deviceCode.slice(0, 12)}\u2026`);
+  async me() {
+    const balance = await this.balance();
+    const wallet = this.storage.get(KEY_WALLET);
+    const credits = this.storage.get(KEY_CREDITS) ?? [];
+    const paid = this.storage.get(KEY_PAID) ?? 0;
     return {
-      status: "ok",
-      token: {
-        access_token: `mock-token-${deviceId}`,
-        token_type: "Bearer",
-        device_id: deviceId
-      }
+      developer_id: "mock-developer",
+      key_prefix: MOCK_KEY_PREFIX,
+      wallet_address: wallet?.address ?? null,
+      balance,
+      earned: paid + credits.reduce((s, c) => s + c.tokens, 0),
+      active_seconds: this.storage.get(KEY_ACTIVE) ?? 0
     };
+  }
+  async heartbeat(activeSeconds) {
+    const total = (this.storage.get(KEY_ACTIVE) ?? 0) + Math.max(0, activeSeconds);
+    await this.storage.update(KEY_ACTIVE, total);
+    this.log.appendLine(`[mock] heartbeat +${activeSeconds}s (total ${total}s)`);
   }
   async getNextAd(sessionId) {
     if (this.ads.length === 0) return null;
@@ -369,6 +391,9 @@ var MockAdapter = class {
   async postEvents(events) {
     const seen = new Set(this.storage.get(KEY_SEEN_EVENTS) ?? []);
     const credits = this.storage.get(KEY_CREDITS) ?? [];
+    const lastReward = this.storage.get(KEY_LAST_REWARD) ?? {};
+    let accepted = 0;
+    let rewarded = 0;
     for (const event of events) {
       const duplicate = seen.has(event.id);
       this.log.appendLine(
@@ -376,43 +401,30 @@ var MockAdapter = class {
       );
       if (duplicate) continue;
       seen.add(event.id);
+      accepted++;
       if (event.type === "impression") {
         const ad = this.ads.find((a) => a.id === event.ad_id);
-        if (ad) {
+        const last = lastReward[event.ad_id] ?? -Infinity;
+        if (ad && this.now() - last >= REWARD_COOLDOWN_MS) {
           credits.push({
             ad_id: ad.id,
             tokens: ad.reward_tokens,
             at: this.now()
           });
+          lastReward[event.ad_id] = this.now();
+          rewarded += ad.reward_tokens;
           this.log.appendLine(`[mock] credited ${ad.reward_tokens} ${CURRENCY}`);
+        } else if (ad) {
+          this.log.appendLine(
+            `[mock] impression not rewarded: ${ad.id} rewarded within the last 6 hours`
+          );
         }
       }
     }
     await this.storage.update(KEY_SEEN_EVENTS, [...seen].slice(-1e3));
     await this.storage.update(KEY_CREDITS, credits);
-    const balance = await this.getBalance();
-    return { accepted: events.length, balance };
-  }
-  async getBalance() {
-    const credits = this.storage.get(KEY_CREDITS) ?? [];
-    let settled = this.storage.get(KEY_SETTLED) ?? 0;
-    const cutoff = this.now() - SETTLE_AFTER_MS;
-    const stillPending = [];
-    for (const credit of credits) {
-      if (credit.at <= cutoff) settled += credit.tokens;
-      else stillPending.push(credit);
-    }
-    if (stillPending.length !== credits.length) {
-      await this.storage.update(KEY_CREDITS, stillPending);
-      await this.storage.update(KEY_SETTLED, settled);
-    }
-    const pending = stillPending.reduce((sum, c) => sum + c.tokens, 0);
-    return {
-      pending,
-      settled,
-      currency: CURRENCY,
-      updated_at: new Date(this.now()).toISOString()
-    };
+    await this.storage.update(KEY_LAST_REWARD, lastReward);
+    return { accepted, rewarded, balance: await this.balance() };
   }
   async linkWallet(address) {
     const wallet = {
@@ -432,13 +444,34 @@ var MockAdapter = class {
     for (const key of [
       KEY_INDEX,
       KEY_CREDITS,
-      KEY_SETTLED,
+      KEY_PAID,
       KEY_SEEN_EVENTS,
       KEY_WALLET,
-      KEY_DEVICE_ID
+      KEY_ACTIVE,
+      KEY_LAST_REWARD
     ]) {
       await this.storage.update(key, void 0);
     }
+  }
+  async balance() {
+    const credits = this.storage.get(KEY_CREDITS) ?? [];
+    let paid = this.storage.get(KEY_PAID) ?? 0;
+    const cutoff = this.now() - PAYOUT_AFTER_MS;
+    const open = [];
+    for (const credit of credits) {
+      if (credit.at <= cutoff) paid += credit.tokens;
+      else open.push(credit);
+    }
+    if (open.length !== credits.length) {
+      await this.storage.update(KEY_CREDITS, open);
+      await this.storage.update(KEY_PAID, paid);
+    }
+    return {
+      pending: open.reduce((sum, c) => sum + c.tokens, 0),
+      settled: paid,
+      currency: CURRENCY,
+      updated_at: new Date(this.now()).toISOString()
+    };
   }
 };
 
@@ -453,7 +486,8 @@ var mock_ads_default = [
     cta_url: "https://example.com/quillstack",
     image_url: "https://placehold.co/640x360/F4EBE3/EA580C.png?text=Quillstack",
     reward_tokens: 12,
-    expires_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-01T00:00:00Z",
+    domain: "example.com"
   },
   {
     id: "mock-002",
@@ -463,7 +497,8 @@ var mock_ads_default = [
     cta_label: "See pricing",
     cta_url: "https://example.com/orbital-cache",
     reward_tokens: 8,
-    expires_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-01T00:00:00Z",
+    domain: "example.com"
   },
   {
     id: "mock-003",
@@ -474,7 +509,8 @@ var mock_ads_default = [
     cta_url: "https://example.com/pinecone-pixel",
     image_url: "https://placehold.co/640x360/F4EBE3/000000.png?text=Pinecone+%26+Pixel",
     reward_tokens: 10,
-    expires_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-01T00:00:00Z",
+    domain: "example.com"
   },
   {
     id: "mock-004",
@@ -484,7 +520,8 @@ var mock_ads_default = [
     cta_label: "Start free",
     cta_url: "https://example.com/ledgerline",
     reward_tokens: 15,
-    expires_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-01T00:00:00Z",
+    domain: "example.com"
   },
   {
     id: "mock-005",
@@ -495,7 +532,8 @@ var mock_ads_default = [
     cta_url: "https://example.com/nimbus-notebook",
     image_url: "https://placehold.co/640x360/EA580C/F4EBE3.png?text=Nimbus",
     reward_tokens: 20,
-    expires_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-01T00:00:00Z",
+    domain: "example.com"
   }
 ];
 
@@ -503,68 +541,37 @@ var mock_ads_default = [
 var MOCK_ADS = mock_ads_default.map((item) => validateAd(item, 0)).filter((ad) => ad !== null);
 
 // src/auth.ts
-async function login(store, api, now = Date.now()) {
-  if (store.getToken()) {
-    return { status: "signed-in", deviceId: store.load().deviceId ?? "" };
+var MOCK_KEY = "VF-MOCK-MOCK-MOCK-MOCK";
+async function login(store, api, input) {
+  let key;
+  if (api.mode === "mock") {
+    key = MOCK_KEY;
+  } else {
+    const result = validateSerialKey(input);
+    if (!result.ok) return { status: "invalid", message: result.message };
+    key = result.key;
   }
-  let pending = store.load().pendingAuth;
-  if (pending && pending.expires_at <= now) pending = null;
-  if (!pending) {
-    try {
-      const res = await api.startDeviceAuth();
-      pending = {
-        device_code: res.device_code,
-        user_code: res.user_code,
-        verification_uri: res.verification_uri_complete ?? res.verification_uri,
-        expires_at: now + res.expires_in * 1e3,
-        interval_ms: Math.max(1, res.interval) * 1e3
-      };
-      const saved = pending;
-      store.update((s) => {
-        s.pendingAuth = saved;
-      });
-    } catch (error) {
-      if (error instanceof ApiUnavailableError) return { status: "offline" };
-      throw error;
-    }
-  }
-  return poll(store, api, pending);
-}
-async function poll(store, api, pending) {
-  let result;
+  store.setToken(key);
   try {
-    result = await api.pollDeviceToken(pending.device_code);
+    const me = await api.me();
+    store.update((s) => {
+      s.keyPrefix = me.key_prefix;
+      s.balance = me.balance;
+      s.walletAddress = me.wallet_address;
+    });
+    store.log(`Signed in as ${me.key_prefix} (${api.mode} mode).`);
+    return { status: "signed-in", keyPrefix: me.key_prefix };
   } catch (error) {
-    if (error instanceof ApiUnavailableError) return { status: "offline" };
+    if (error instanceof UnauthorizedError) {
+      store.setToken(null);
+      return { status: "rejected" };
+    }
+    if (error instanceof ApiUnavailableError) {
+      return { status: "offline" };
+    }
+    store.setToken(null);
     throw error;
   }
-  if (result.status === "ok") {
-    store.setToken(result.token.access_token);
-    store.update((s) => {
-      s.deviceId = result.token.device_id;
-      s.pendingAuth = null;
-    });
-    store.log(`Signed in (${api.mode} mode).`);
-    return { status: "signed-in", deviceId: result.token.device_id };
-  }
-  if (result.error === "expired_token") {
-    store.update((s) => {
-      s.pendingAuth = null;
-    });
-    return { status: "expired" };
-  }
-  if (result.error === "access_denied") {
-    store.update((s) => {
-      s.pendingAuth = null;
-    });
-    return { status: "denied" };
-  }
-  return {
-    status: "waiting",
-    userCode: pending.user_code,
-    verificationUri: pending.verification_uri,
-    expiresAt: pending.expires_at
-  };
 }
 
 // src/state.ts
@@ -574,12 +581,11 @@ var path = __toESM(require("node:path"));
 var DEFAULT_STATE = {
   optedIn: false,
   paused: false,
-  deviceId: null,
+  keyPrefix: null,
   walletAddress: null,
   lastDeliveredAt: null,
   sessions: {},
   balance: null,
-  pendingAuth: null,
   apiBaseUrl: "",
   frequencyMinutes: 30,
   quietPeriodMinutes: 10,
@@ -699,8 +705,12 @@ function clientInfo() {
     surface: "terminal"
   };
 }
+var DEFAULT_API_BASE_URL = "https://vibefuel.app";
 function apiBaseUrl(store) {
-  return (process.env.VIBEFUEL_API_BASE_URL ?? store.load().apiBaseUrl).trim();
+  const raw = (process.env.VIBEFUEL_API_BASE_URL ?? store.load().apiBaseUrl ?? "").trim();
+  if (raw === "") return DEFAULT_API_BASE_URL;
+  if (raw.toLowerCase() === "mock") return "";
+  return raw;
 }
 function createApi(store) {
   const baseUrl = apiBaseUrl(store);
@@ -749,9 +759,9 @@ function formatWait(untilMs, now) {
 var PRIVACY_SUMMARY = `Vibefuel privacy summary (terminal plugin)
 
 Collected
-  - An anonymous device id
-  - Ad events: impression, click, dismiss, with ad id, timestamp and a per-session id
-  - Client name and version (Claude Code) and the plugin version
+  - Your serial key, stored hashed on the server, to tie events to your dashboard
+  - Ad events: impression, click, dismiss, with campaign id, timestamp and a per-session id
+  - Client name (Claude Code) and the plugin version. No active time is reported from the terminal
 
 Never collected
   - File contents, file names, project names or paths
@@ -765,10 +775,11 @@ Rules
   - Links are tracked by a redirect, so a click can be rewarded without any script in your terminal.
   - At most one sponsored line per 30 minutes, none in the first 10 minutes of a session, never mid-task, never inside subagents.
   - /vibefuel:optout deletes ~/.vibefuel entirely.
-  - In mock mode (no API URL set) nothing is sent anywhere; events go to ~/.vibefuel/log.txt.`;
+  - In mock mode (/vibefuel:config api mock) nothing is sent anywhere; events go to ~/.vibefuel/log.txt.
+  - Full summary: https://vibefuel.app/privacy`;
 
 // src/hook.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto = require("node:crypto");
 function parseHookInput(raw) {
   try {
     const parsed = JSON.parse(raw);
@@ -820,11 +831,7 @@ async function onStop(input, ctx) {
     const sessionId = input.session_id ?? "unknown";
     const state = store.load();
     if (!state.optedIn) return {};
-    if (!store.getToken() && state.pendingAuth) {
-      if (state.pendingAuth.expires_at > now)
-        await poll(store, api, state.pendingAuth);
-      else store.update((s) => void (s.pendingAuth = null));
-    }
+    if (!store.getToken()) return {};
     const { decision } = decide(sessionId, ctx);
     if (!decision.allowed) return {};
     const raw = await api.getNextAd(sessionId);
@@ -852,7 +859,7 @@ async function onStop(input, ctx) {
     try {
       const result = await api.postEvents([
         {
-          id: ctx.newId?.() ?? (0, import_node_crypto2.randomUUID)(),
+          id: ctx.newId?.() ?? (0, import_node_crypto.randomUUID)(),
           ad_id: ad.id,
           type: "impression",
           occurred_at: new Date(now).toISOString(),
@@ -865,6 +872,14 @@ async function onStop(input, ctx) {
       }
     } catch (error) {
       store.log(`Could not report impression: ${describe(error)}`);
+    }
+    try {
+      await api.heartbeat(0);
+    } catch {
+    }
+    try {
+      await api.heartbeat(0);
+    } catch {
     }
     return { systemMessage: formatSponsoredLine(ad) };
   } catch (error) {
@@ -929,7 +944,7 @@ async function main(argv) {
       out(
         "Vibefuel is on. One labelled sponsored line may appear after a task finishes, at most every 30 minutes and never in the first 10 minutes of a session."
       );
-      return runLogin(store);
+      return runLogin(store, rest);
     }
     case "optout": {
       store.wipe();
@@ -939,7 +954,7 @@ async function main(argv) {
       return 0;
     }
     case "login":
-      return runLogin(store);
+      return runLogin(store, rest);
     case "pause":
       store.update((s) => void (s.paused = true));
       out("Vibefuel paused. No sponsored lines until /vibefuel:resume.");
@@ -982,39 +997,45 @@ async function main(argv) {
       return command ? 1 : 0;
   }
 }
-async function runLogin(store) {
+async function runLogin(store, args) {
   if (!store.load().optedIn) {
     out("Run /vibefuel:optin first.");
     return 0;
   }
   const api = createApi(store);
+  const input = args.join(" ").trim();
+  if (api.mode === "http" && !input) {
+    if (store.getToken()) {
+      out(
+        `Already signed in as ${store.load().keyPrefix ?? "your key"}. To switch keys: /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX`
+      );
+      return 0;
+    }
+    out(
+      [
+        `Create a free serial key at ${LANDING_URL}/start (no email, no password), then run:`,
+        "  /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX"
+      ].join("\n")
+    );
+    return 0;
+  }
   try {
-    const result = await login(store, api);
+    const result = await login(store, api, input);
     switch (result.status) {
       case "signed-in":
-        out(
-          `Signed in (${api.mode} mode). Device id ${result.deviceId.slice(0, 8)}\u2026`
-        );
+        out(`Signed in as ${result.keyPrefix} (${api.mode} mode).`);
         return 0;
-      case "waiting":
-        out(
-          [
-            `Open ${result.verificationUri} and enter the code ${result.userCode}.`,
-            `This code expires ${formatWait(result.expiresAt, Date.now())}. Run /vibefuel:login again to check, or just keep working: sign-in completes on its own.`
-          ].join("\n")
-        );
+      case "invalid":
+        out(result.message);
         return 0;
-      case "expired":
+      case "rejected":
         out(
-          "That sign-in code expired. Run /vibefuel:login again for a new one."
+          `That key was not accepted. Create one at ${LANDING_URL}/start and try again.`
         );
-        return 0;
-      case "denied":
-        out("Sign-in was declined in the browser.");
         return 0;
       case "offline":
         out(
-          `Could not reach the Vibefuel API at ${apiBaseUrl(store)}. Sign-in will be retried after your next task.`
+          `Could not reach the Vibefuel API at ${apiBaseUrl(store)}. The key is saved and will be checked after your next task.`
         );
         return 0;
     }
@@ -1034,17 +1055,23 @@ async function runStatus(store) {
     `Vibefuel: ${state.optedIn ? "on" : "off (run /vibefuel:optin)"}${state.paused ? ", paused" : ""}`
   );
   lines.push(
-    `Mode: ${api.mode === "mock" ? "mock (no API URL set; nothing is sent anywhere)" : apiBaseUrl(store)}`
+    `Mode: ${api.mode === "mock" ? "mock (fictional ads, nothing is sent anywhere)" : apiBaseUrl(store)}`
   );
   lines.push(
-    `Signed in: ${signedIn ? "yes" : state.pendingAuth ? "waiting for browser approval" : "no"}`
+    `Signed in: ${signedIn ? `yes (${state.keyPrefix ?? "key saved"})` : "no (run /vibefuel:login <key>)"}`
   );
+  let wallet = state.walletAddress;
   if (state.optedIn && signedIn) {
     try {
-      const balance = await api.getBalance();
-      store.update((s) => void (s.balance = balance));
+      const me = await api.me();
+      wallet = me.wallet_address;
+      store.update((s) => {
+        s.balance = me.balance;
+        s.keyPrefix = me.key_prefix;
+        s.walletAddress = me.wallet_address;
+      });
       lines.push(
-        `Balance: ${formatBalance(balance)} (pending ${formatTokens(balance.pending)}, settled ${formatTokens(balance.settled)})`
+        `Balance: ${formatBalance(me.balance)} (available ${formatTokens(me.balance.pending)}, paid out ${formatTokens(me.balance.settled)}, earned ${formatTokens(me.earned)} all time)`
       );
     } catch (error) {
       lines.push(
@@ -1053,7 +1080,7 @@ async function runStatus(store) {
     }
   }
   lines.push(
-    `Wallet: ${state.walletAddress ? shortenAddress(state.walletAddress) : "none linked (use /vibefuel:wallet <address>)"}`
+    `Wallet: ${wallet ? shortenAddress(wallet) : "none linked (use /vibefuel:wallet <address>)"}`
   );
   if (state.lastAd) {
     lines.push(
@@ -1070,50 +1097,41 @@ async function runStatus(store) {
   } else {
     lines.push("Next: a sponsored line may appear after your next task");
   }
-  lines.push(`Website: ${LANDING_URL}`);
+  lines.push(`Dashboard: ${LANDING_URL}/dashboard`);
   out(lines.join("\n"));
   return 0;
 }
 async function runWallet(store, args) {
   const api = createApi(store);
-  if (args[0] === "--unlink" || args[0] === "unlink") {
-    store.update((s) => void (s.walletAddress = null));
-    if (store.getToken()) {
-      try {
-        await api.unlinkWallet();
-      } catch {
-      }
-    }
-    out("Wallet address unlinked.");
+  if (!store.getToken()) {
+    out("Sign in first: /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX");
     return 0;
   }
-  const input = args.join(" ");
-  const result = validateSolanaAddress(input);
+  if (args[0] === "--unlink" || args[0] === "unlink") {
+    try {
+      await api.unlinkWallet();
+      store.update((s) => void (s.walletAddress = null));
+      out("Wallet address unlinked.");
+    } catch {
+      out("Could not reach the Vibefuel API. Try again in a moment.");
+    }
+    return 0;
+  }
+  const result = validateSolanaAddress(args.join(" "));
   if (!result.ok) {
     out(
       `${describeWalletError(result.reason)} Vibefuel only ever stores a public address, never a private key or seed phrase.`
     );
     return 0;
   }
-  store.update((s) => void (s.walletAddress = result.address));
-  if (store.getToken()) {
-    try {
-      await api.linkWallet(result.address);
-      out(`Wallet ${shortenAddress(result.address)} linked.`);
-    } catch (error) {
-      if (error instanceof ApiRequestError) {
-        store.update((s) => void (s.walletAddress = null));
-        out(`The API rejected that address: ${error.message}`);
-      } else {
-        out(
-          `Wallet ${shortenAddress(result.address)} saved locally; it will sync when the API is reachable.`
-        );
-      }
-    }
-  } else {
-    out(
-      `Wallet ${shortenAddress(result.address)} saved. It syncs once you are signed in.`
-    );
+  try {
+    await api.linkWallet(result.address);
+    store.update((s) => void (s.walletAddress = result.address));
+    out(`Wallet ${shortenAddress(result.address)} linked.`);
+  } catch (error) {
+    if (error instanceof ApiRequestError)
+      out(`The API rejected that address: ${error.message}`);
+    else out("Could not reach the Vibefuel API. Try again in a moment.");
   }
   return 0;
 }
@@ -1123,7 +1141,7 @@ function runConfig(store, args) {
   if (!key) {
     out(
       [
-        `api: ${state.apiBaseUrl || "(empty, mock mode)"}`,
+        `api: ${apiBaseUrl(store) || "mock"}`,
         `frequency: ${state.frequencyMinutes} minutes (min 15)`,
         `quiet: ${state.quietPeriodMinutes} minutes`
       ].join("\n")
@@ -1132,16 +1150,16 @@ function runConfig(store, args) {
   }
   switch (key) {
     case "api": {
-      const url = (value ?? "").trim();
-      if (url && !/^https?:\/\//.test(url)) {
-        out("The API URL must start with http:// or https://.");
+      const raw = (value ?? "").trim();
+      const url = raw.toLowerCase() === "mock" ? "mock" : raw;
+      if (url && url !== "mock" && !/^https?:\/\//.test(url)) {
+        out("The API URL must start with http:// or https://, or be 'mock'.");
         return 0;
       }
       store.update((s) => void (s.apiBaseUrl = url));
       store.setToken(null);
-      store.update((s) => void (s.pendingAuth = null));
       out(
-        url ? `API set to ${url}. Signed out; run /vibefuel:login.` : "API cleared; mock mode. Signed out."
+        url === "mock" ? "Mock mode: fictional ads, nothing is sent anywhere. Signed out." : url ? `API set to ${url}. Signed out; run /vibefuel:login <key>.` : `API reset to ${DEFAULT_API_BASE_URL}. Signed out; run /vibefuel:login <key>.`
       );
       return 0;
     }
@@ -1158,7 +1176,7 @@ function runConfig(store, args) {
       return 0;
     }
     default:
-      out("Usage: config [api <url>|frequency <minutes>|quiet <minutes>]");
+      out("Usage: config [api <url|mock>|frequency <minutes>|quiet <minutes>]");
       return 0;
   }
 }

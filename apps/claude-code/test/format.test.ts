@@ -31,7 +31,7 @@ describe("formatSponsoredLine", () => {
 
 describe("formatStatusLine", () => {
   it("shows balance, pause and new markers", () => {
-    const balance = { pending: 20, settled: 108, currency: "FUEL" }
+    const balance = { pending: 20, settled: 108, currency: "tokens" }
     expect(
       formatStatusLine({
         optedIn: false,
@@ -42,9 +42,9 @@ describe("formatStatusLine", () => {
     ).toContain("off")
     expect(
       formatStatusLine({ optedIn: true, paused: false, balance, pending: true })
-    ).toBe("⛽ 128 FUEL · ● new")
+    ).toBe("⛽ 128 tokens · ● new")
     expect(
       formatStatusLine({ optedIn: true, paused: true, balance, pending: true })
-    ).toBe("⛽ 128 FUEL · paused")
+    ).toBe("⛽ 128 tokens · paused")
   })
 })

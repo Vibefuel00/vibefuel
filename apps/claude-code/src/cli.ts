@@ -6,7 +6,7 @@ import {
   validateSolanaAddress,
 } from "@workspace/vibefuel-core"
 import { login } from "./auth"
-import { apiBaseUrl, createApi } from "./client"
+import { DEFAULT_API_BASE_URL, apiBaseUrl, createApi } from "./client"
 import {
   PRIVACY_SUMMARY,
   formatBalance,
@@ -73,7 +73,7 @@ async function main(argv: string[]): Promise<number> {
       out(
         "Vibefuel is on. One labelled sponsored line may appear after a task finishes, at most every 30 minutes and never in the first 10 minutes of a session."
       )
-      return runLogin(store)
+      return runLogin(store, rest)
     }
 
     case "optout": {
@@ -85,7 +85,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case "login":
-      return runLogin(store)
+      return runLogin(store, rest)
 
     case "pause":
       store.update((s) => void (s.paused = true))
@@ -137,39 +137,45 @@ async function main(argv: string[]): Promise<number> {
   }
 }
 
-async function runLogin(store: StateStore): Promise<number> {
+async function runLogin(store: StateStore, args: string[]): Promise<number> {
   if (!store.load().optedIn) {
     out("Run /vibefuel:optin first.")
     return 0
   }
   const api = createApi(store)
+  const input = args.join(" ").trim()
+  if (api.mode === "http" && !input) {
+    if (store.getToken()) {
+      out(
+        `Already signed in as ${store.load().keyPrefix ?? "your key"}. To switch keys: /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX`
+      )
+      return 0
+    }
+    out(
+      [
+        `Create a free serial key at ${LANDING_URL}/start (no email, no password), then run:`,
+        "  /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX",
+      ].join("\n")
+    )
+    return 0
+  }
   try {
-    const result = await login(store, api)
+    const result = await login(store, api, input)
     switch (result.status) {
       case "signed-in":
-        out(
-          `Signed in (${api.mode} mode). Device id ${result.deviceId.slice(0, 8)}…`
-        )
+        out(`Signed in as ${result.keyPrefix} (${api.mode} mode).`)
         return 0
-      case "waiting":
-        out(
-          [
-            `Open ${result.verificationUri} and enter the code ${result.userCode}.`,
-            `This code expires ${formatWait(result.expiresAt, Date.now())}. Run /vibefuel:login again to check, or just keep working: sign-in completes on its own.`,
-          ].join("\n")
-        )
+      case "invalid":
+        out(result.message)
         return 0
-      case "expired":
+      case "rejected":
         out(
-          "That sign-in code expired. Run /vibefuel:login again for a new one."
+          `That key was not accepted. Create one at ${LANDING_URL}/start and try again.`
         )
-        return 0
-      case "denied":
-        out("Sign-in was declined in the browser.")
         return 0
       case "offline":
         out(
-          `Could not reach the Vibefuel API at ${apiBaseUrl(store)}. Sign-in will be retried after your next task.`
+          `Could not reach the Vibefuel API at ${apiBaseUrl(store)}. The key is saved and will be checked after your next task.`
         )
         return 0
     }
@@ -190,17 +196,23 @@ async function runStatus(store: StateStore): Promise<number> {
     `Vibefuel: ${state.optedIn ? "on" : "off (run /vibefuel:optin)"}${state.paused ? ", paused" : ""}`
   )
   lines.push(
-    `Mode: ${api.mode === "mock" ? "mock (no API URL set; nothing is sent anywhere)" : apiBaseUrl(store)}`
+    `Mode: ${api.mode === "mock" ? "mock (fictional ads, nothing is sent anywhere)" : apiBaseUrl(store)}`
   )
   lines.push(
-    `Signed in: ${signedIn ? "yes" : state.pendingAuth ? "waiting for browser approval" : "no"}`
+    `Signed in: ${signedIn ? `yes (${state.keyPrefix ?? "key saved"})` : "no (run /vibefuel:login <key>)"}`
   )
+  let wallet = state.walletAddress
   if (state.optedIn && signedIn) {
     try {
-      const balance = await api.getBalance()
-      store.update((s) => void (s.balance = balance))
+      const me = await api.me()
+      wallet = me.wallet_address
+      store.update((s) => {
+        s.balance = me.balance
+        s.keyPrefix = me.key_prefix
+        s.walletAddress = me.wallet_address
+      })
       lines.push(
-        `Balance: ${formatBalance(balance)} (pending ${formatTokens(balance.pending)}, settled ${formatTokens(balance.settled)})`
+        `Balance: ${formatBalance(me.balance)} (available ${formatTokens(me.balance.pending)}, paid out ${formatTokens(me.balance.settled)}, earned ${formatTokens(me.earned)} all time)`
       )
     } catch (error) {
       lines.push(
@@ -209,7 +221,7 @@ async function runStatus(store: StateStore): Promise<number> {
     }
   }
   lines.push(
-    `Wallet: ${state.walletAddress ? shortenAddress(state.walletAddress) : "none linked (use /vibefuel:wallet <address>)"}`
+    `Wallet: ${wallet ? shortenAddress(wallet) : "none linked (use /vibefuel:wallet <address>)"}`
   )
   if (state.lastAd) {
     lines.push(
@@ -231,52 +243,42 @@ async function runStatus(store: StateStore): Promise<number> {
   } else {
     lines.push("Next: a sponsored line may appear after your next task")
   }
-  lines.push(`Website: ${LANDING_URL}`)
+  lines.push(`Dashboard: ${LANDING_URL}/dashboard`)
   out(lines.join("\n"))
   return 0
 }
 
 async function runWallet(store: StateStore, args: string[]): Promise<number> {
   const api = createApi(store)
-  if (args[0] === "--unlink" || args[0] === "unlink") {
-    store.update((s) => void (s.walletAddress = null))
-    if (store.getToken()) {
-      try {
-        await api.unlinkWallet()
-      } catch {
-        // Local unlink already happened; the server copy is cleared next sync.
-      }
-    }
-    out("Wallet address unlinked.")
+  if (!store.getToken()) {
+    out("Sign in first: /vibefuel:login VF-XXXX-XXXX-XXXX-XXXX")
     return 0
   }
-  const input = args.join(" ")
-  const result = validateSolanaAddress(input)
+  if (args[0] === "--unlink" || args[0] === "unlink") {
+    try {
+      await api.unlinkWallet()
+      store.update((s) => void (s.walletAddress = null))
+      out("Wallet address unlinked.")
+    } catch {
+      out("Could not reach the Vibefuel API. Try again in a moment.")
+    }
+    return 0
+  }
+  const result = validateSolanaAddress(args.join(" "))
   if (!result.ok) {
     out(
       `${describeWalletError(result.reason)} Vibefuel only ever stores a public address, never a private key or seed phrase.`
     )
     return 0
   }
-  store.update((s) => void (s.walletAddress = result.address))
-  if (store.getToken()) {
-    try {
-      await api.linkWallet(result.address)
-      out(`Wallet ${shortenAddress(result.address)} linked.`)
-    } catch (error) {
-      if (error instanceof ApiRequestError) {
-        store.update((s) => void (s.walletAddress = null))
-        out(`The API rejected that address: ${error.message}`)
-      } else {
-        out(
-          `Wallet ${shortenAddress(result.address)} saved locally; it will sync when the API is reachable.`
-        )
-      }
-    }
-  } else {
-    out(
-      `Wallet ${shortenAddress(result.address)} saved. It syncs once you are signed in.`
-    )
+  try {
+    await api.linkWallet(result.address)
+    store.update((s) => void (s.walletAddress = result.address))
+    out(`Wallet ${shortenAddress(result.address)} linked.`)
+  } catch (error) {
+    if (error instanceof ApiRequestError)
+      out(`The API rejected that address: ${error.message}`)
+    else out("Could not reach the Vibefuel API. Try again in a moment.")
   }
   return 0
 }
@@ -287,7 +289,7 @@ function runConfig(store: StateStore, args: string[]): number {
   if (!key) {
     out(
       [
-        `api: ${state.apiBaseUrl || "(empty, mock mode)"}`,
+        `api: ${apiBaseUrl(store) || "mock"}`,
         `frequency: ${state.frequencyMinutes} minutes (min 15)`,
         `quiet: ${state.quietPeriodMinutes} minutes`,
       ].join("\n")
@@ -296,18 +298,20 @@ function runConfig(store: StateStore, args: string[]): number {
   }
   switch (key) {
     case "api": {
-      const url = (value ?? "").trim()
-      if (url && !/^https?:\/\//.test(url)) {
-        out("The API URL must start with http:// or https://.")
+      const raw = (value ?? "").trim()
+      const url = raw.toLowerCase() === "mock" ? "mock" : raw
+      if (url && url !== "mock" && !/^https?:\/\//.test(url)) {
+        out("The API URL must start with http:// or https://, or be 'mock'.")
         return 0
       }
       store.update((s) => void (s.apiBaseUrl = url))
       store.setToken(null)
-      store.update((s) => void (s.pendingAuth = null))
       out(
-        url
-          ? `API set to ${url}. Signed out; run /vibefuel:login.`
-          : "API cleared; mock mode. Signed out."
+        url === "mock"
+          ? "Mock mode: fictional ads, nothing is sent anywhere. Signed out."
+          : url
+            ? `API set to ${url}. Signed out; run /vibefuel:login <key>.`
+            : `API reset to ${DEFAULT_API_BASE_URL}. Signed out; run /vibefuel:login <key>.`
       )
       return 0
     }
@@ -324,7 +328,7 @@ function runConfig(store: StateStore, args: string[]): number {
       return 0
     }
     default:
-      out("Usage: config [api <url>|frequency <minutes>|quiet <minutes>]")
+      out("Usage: config [api <url|mock>|frequency <minutes>|quiet <minutes>]")
       return 0
   }
 }

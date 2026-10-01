@@ -31,15 +31,16 @@ claude plugin install vibefuel@vibefuel
 
 Or from inside a session: `/plugin install vibefuel --marketplace vibefuel/vibefuel-claude-code`.
 
-Then opt in. Nothing runs before this step:
+Then opt in and sign in with a free serial key from
+[vibefuel.app/start](https://vibefuel.app/start). Nothing runs before this:
 
 ```
 /vibefuel:optin
+/vibefuel:login VF-XXXX-XXXX-XXXX-XXXX
 ```
 
-In mock mode (the default) a local device id is generated and no events leave
-your machine. To use a Vibefuel API: `/vibefuel:config api https://<host>` then
-`/vibefuel:login`, which shows a short code to enter in your browser.
+The key is stored in `~/.vibefuel/token` with owner-only permissions. For a
+fully offline try-out with fictional ads: `/vibefuel:config api mock`.
 
 ## Commands
 
@@ -72,18 +73,19 @@ the `statusLine` entry for `~/.claude/settings.json` and offers to add it.
 
 ## Privacy
 
-Collected: an anonymous device id, ad events (impression, click, dismiss) with
-the ad id, a timestamp and a random per-session id, the client name and
-version, and the plugin version.
+Collected: your serial key (stored hashed on the server), ad events
+(impression, click, dismiss) with the campaign id, a timestamp and a random
+per-session id, the client name and plugin version. No active time is reported
+from the terminal.
 
 Never collected: file contents, file names, project names or paths, prompts,
 chat messages, transcripts or AI completions, keystrokes or clipboard, git
 remotes or identities. The hook reads only `session_id` and `agent_id` from
 the hook input and never opens the transcript.
 
-State lives in `~/.vibefuel` with owner-only permissions. The device token and
-the public wallet address are the only secrets, and `/vibefuel:optout` deletes
-the directory. Vibefuel never asks for a private key or seed phrase.
+State lives in `~/.vibefuel` with owner-only permissions. The serial key is the
+only secret, and `/vibefuel:optout` deletes the directory. Vibefuel never asks
+for a private key or seed phrase. Full summary: https://vibefuel.app/privacy
 
 ## Development
 

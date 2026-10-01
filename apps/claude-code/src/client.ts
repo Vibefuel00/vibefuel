@@ -20,8 +20,18 @@ export function clientInfo(): ClientInfo {
   }
 }
 
+export const DEFAULT_API_BASE_URL = "https://vibefuel.app"
+
+/** Env wins, then the stored setting. "" means the default host; "mock" selects mock mode. */
 export function apiBaseUrl(store: StateStore): string {
-  return (process.env.VIBEFUEL_API_BASE_URL ?? store.load().apiBaseUrl).trim()
+  const raw = (
+    process.env.VIBEFUEL_API_BASE_URL ??
+    store.load().apiBaseUrl ??
+    ""
+  ).trim()
+  if (raw === "") return DEFAULT_API_BASE_URL
+  if (raw.toLowerCase() === "mock") return ""
+  return raw
 }
 
 export function createApi(store: StateStore): VibefuelApi {

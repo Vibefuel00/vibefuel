@@ -1,5 +1,5 @@
 ---
-description: Show or change Vibefuel settings: api <url>, frequency <minutes>, quiet <minutes>
+description: Show or change Vibefuel settings: api <url|mock>, frequency <minutes>, quiet <minutes>
 argument-hint: [api <url>|frequency <n>|quiet <n>]
 allowed-tools: Bash(node:*)
 ---

@@ -1,89 +1,56 @@
-import { ApiUnavailableError, type VibefuelApi } from "@workspace/vibefuel-core"
+import {
+  ApiUnavailableError,
+  UnauthorizedError,
+  validateSerialKey,
+  type VibefuelApi,
+} from "@workspace/vibefuel-core"
 import type { StateStore } from "./state"
 
+export const MOCK_KEY = "VF-MOCK-MOCK-MOCK-MOCK"
+
 export type LoginResult =
-  | { status: "signed-in"; deviceId: string }
-  | {
-      status: "waiting"
-      userCode: string
-      verificationUri: string
-      expiresAt: number
-    }
-  | { status: "expired" }
-  | { status: "denied" }
+  | { status: "signed-in"; keyPrefix: string }
+  | { status: "invalid"; message: string }
+  | { status: "rejected" }
   | { status: "offline" }
 
-/** Start the device code flow, or finish one already in progress. */
+/**
+ * Sign in with a serial key from vibefuel.app. In mock mode no key is needed.
+ * The key is verified with GET /api/ext/me and stored with 0600 permissions.
+ */
 export async function login(
   store: StateStore,
   api: VibefuelApi,
-  now = Date.now()
+  input: string
 ): Promise<LoginResult> {
-  if (store.getToken()) {
-    return { status: "signed-in", deviceId: store.load().deviceId ?? "" }
+  let key: string
+  if (api.mode === "mock") {
+    key = MOCK_KEY
+  } else {
+    const result = validateSerialKey(input)
+    if (!result.ok) return { status: "invalid", message: result.message }
+    key = result.key
   }
-  let pending = store.load().pendingAuth
-  if (pending && pending.expires_at <= now) pending = null
-  if (!pending) {
-    try {
-      const res = await api.startDeviceAuth()
-      pending = {
-        device_code: res.device_code,
-        user_code: res.user_code,
-        verification_uri: res.verification_uri_complete ?? res.verification_uri,
-        expires_at: now + res.expires_in * 1000,
-        interval_ms: Math.max(1, res.interval) * 1000,
-      }
-      const saved = pending
-      store.update((s) => {
-        s.pendingAuth = saved
-      })
-    } catch (error) {
-      if (error instanceof ApiUnavailableError) return { status: "offline" }
-      throw error
-    }
-  }
-  return poll(store, api, pending)
-}
-
-/** One poll of the token endpoint. Called by login and by the Stop hook. */
-export async function poll(
-  store: StateStore,
-  api: VibefuelApi,
-  pending: NonNullable<ReturnType<StateStore["load"]>["pendingAuth"]>
-): Promise<LoginResult> {
-  let result
+  store.setToken(key)
   try {
-    result = await api.pollDeviceToken(pending.device_code)
+    const me = await api.me()
+    store.update((s) => {
+      s.keyPrefix = me.key_prefix
+      s.balance = me.balance
+      s.walletAddress = me.wallet_address
+    })
+    store.log(`Signed in as ${me.key_prefix} (${api.mode} mode).`)
+    return { status: "signed-in", keyPrefix: me.key_prefix }
   } catch (error) {
-    if (error instanceof ApiUnavailableError) return { status: "offline" }
+    if (error instanceof UnauthorizedError) {
+      store.setToken(null)
+      return { status: "rejected" }
+    }
+    if (error instanceof ApiUnavailableError) {
+      // Keep the key; the Stop hook verifies it once the API is reachable.
+      return { status: "offline" }
+    }
+    store.setToken(null)
     throw error
-  }
-  if (result.status === "ok") {
-    store.setToken(result.token.access_token)
-    store.update((s) => {
-      s.deviceId = result.token.device_id
-      s.pendingAuth = null
-    })
-    store.log(`Signed in (${api.mode} mode).`)
-    return { status: "signed-in", deviceId: result.token.device_id }
-  }
-  if (result.error === "expired_token") {
-    store.update((s) => {
-      s.pendingAuth = null
-    })
-    return { status: "expired" }
-  }
-  if (result.error === "access_denied") {
-    store.update((s) => {
-      s.pendingAuth = null
-    })
-    return { status: "denied" }
-  }
-  return {
-    status: "waiting",
-    userCode: pending.user_code,
-    verificationUri: pending.verification_uri,
-    expiresAt: pending.expires_at,
   }
 }

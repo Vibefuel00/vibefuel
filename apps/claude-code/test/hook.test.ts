@@ -51,10 +51,8 @@ describe("parseHookInput", () => {
 describe("Stop hook", () => {
   async function signIn() {
     store.update((s) => void (s.optedIn = true))
-    const c = ctx()
-    const start = await c.api.startDeviceAuth()
-    const token = await c.api.pollDeviceToken(start.device_code)
-    if (token.status === "ok") store.setToken(token.token.access_token)
+    store.setToken("VF-MOCK-MOCK-MOCK-MOCK")
+    await Promise.resolve()
   }
 
   it("shows nothing before opt-in", async () => {

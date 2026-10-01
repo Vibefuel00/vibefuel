@@ -10,7 +10,7 @@ let home: string
 function run(args: string[], stdin = ""): string {
   return execFileSync("node", [BIN, ...args], {
     input: stdin,
-    env: { ...process.env, VIBEFUEL_HOME: home },
+    env: { ...process.env, VIBEFUEL_HOME: home, VIBEFUEL_API_BASE_URL: "mock" },
     encoding: "utf8",
   })
 }
@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe("vibefuel CLI (built bundle, mock mode)", () => {
   it("opt-in signs in locally and a Stop hook shows a line after the quiet period", () => {
-    expect(run(["optin"])).toContain("Signed in (mock mode)")
+    expect(run(["optin"])).toContain("Signed in as VF-MOCK (mock mode)")
     expect(run(["config", "quiet", "0"])).toContain("Quiet period set to 0")
     const stop = run(
       ["hook", "stop"],
@@ -32,8 +32,8 @@ describe("vibefuel CLI (built bundle, mock mode)", () => {
     )
     const parsed = JSON.parse(stop) as { systemMessage: string }
     expect(parsed.systemMessage).toMatch(/^Sponsored · /)
-    expect(run(["statusline"], "{}")).toMatch(/^⛽ 12 FUEL · ● new/)
-    expect(run(["status"])).toContain("Balance: 12 FUEL")
+    expect(run(["statusline"], "{}")).toMatch(/^⛽ 12 tokens · ● new/)
+    expect(run(["status"])).toContain("Balance: 12 tokens")
   })
 
   it("stays silent and exits 0 on a Stop hook before opt-in", () => {
