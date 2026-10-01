@@ -245,52 +245,78 @@ body {
   gap: 10px;
 }
 
-/* Install chips: one per tool, above the main actions. */
+/* Install badges: app-store style, one per tool, in the brand's color. */
 .hero-installs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 440px;
+  margin: 0 0 16px;
+}
+
+.install-badge {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
-}
-
-.install-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px 7px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.45);
-  color: var(--ink);
-  font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.1px;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 14px 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--badge-bg) 70%, #000);
+  border-radius: 12px;
+  background-color: var(--badge-bg);
+  color: var(--badge-fg);
   text-decoration: none;
-  white-space: nowrap;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    transform 160ms ease,
+    filter 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.install-chip:hover {
-  border-color: var(--ink);
-  background-color: #fff;
+.install-badge:hover {
   transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.45);
 }
 
-.install-chip:focus-visible {
+.install-badge:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
-.install-chip-logo {
-  width: 15px;
-  height: 15px;
+.install-badge-logo {
+  width: 24px;
+  height: 24px;
   flex: none;
+}
+
+.install-badge-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.install-badge-eyebrow {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  opacity: 0.82;
+}
+
+.install-badge-title {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 420px) {
+  .hero-installs {
+    grid-template-columns: 1fr;
+  }
 }
 
 .hero-aside {

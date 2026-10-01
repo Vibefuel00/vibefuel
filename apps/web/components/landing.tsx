@@ -74,10 +74,38 @@ const SECONDARY_HREF: Record<Role, string> = {
 }
 
 const INSTALLS = [
-  { label: "VS Code", href: LINKS.marketplace, Logo: VSCodeLogo },
-  { label: "Cursor", href: LINKS.openVsx, Logo: CursorLogo },
-  { label: "Claude Code", href: LINKS.claudeCodeRepo, Logo: ClaudeLogo },
-  { label: "GitHub", href: LINKS.sourceRepo, Logo: GitHubLogo },
+  {
+    eyebrow: "Download on the",
+    title: "VS Code Marketplace",
+    href: LINKS.marketplace,
+    Logo: VSCodeLogo,
+    bg: "#0078d4",
+    fg: "#ffffff",
+  },
+  {
+    eyebrow: "Get it for Cursor on",
+    title: "Open VSX",
+    href: LINKS.openVsx,
+    Logo: CursorLogo,
+    bg: "#0a0a0a",
+    fg: "#ffffff",
+  },
+  {
+    eyebrow: "Install the plugin for",
+    title: "Claude Code",
+    href: LINKS.claudeCodeRepo,
+    Logo: ClaudeLogo,
+    bg: "#d97757",
+    fg: "#ffffff",
+  },
+  {
+    eyebrow: "View the source on",
+    title: "GitHub",
+    href: LINKS.sourceRepo,
+    Logo: GitHubLogo,
+    bg: "#24292f",
+    fg: "#ffffff",
+  },
 ] as const
 
 function HeroCopyBlock({
@@ -127,15 +155,24 @@ function HeroCopyBlock({
         <div className="hero-installs" aria-label="Install Vibefuel">
           {INSTALLS.map((item) => (
             <a
-              key={item.label}
+              key={item.title}
               href={item.href}
-              className="install-chip"
+              className="install-badge"
+              style={
+                {
+                  "--badge-bg": item.bg,
+                  "--badge-fg": item.fg,
+                } as React.CSSProperties
+              }
               target="_blank"
               rel="noopener"
               tabIndex={active ? 0 : -1}
             >
-              <item.Logo className="install-chip-logo" />
-              {item.label}
+              <item.Logo className="install-badge-logo" />
+              <span className="install-badge-text">
+                <span className="install-badge-eyebrow">{item.eyebrow}</span>
+                <span className="install-badge-title">{item.title}</span>
+              </span>
             </a>
           ))}
         </div>
