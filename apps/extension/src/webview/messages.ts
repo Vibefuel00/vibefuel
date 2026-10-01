@@ -1,5 +1,4 @@
-import type { Ad, Balance } from "../api/types"
-import type { PolicyBlockReason } from "../ads/policy"
+import type { Ad, Balance, PolicyBlockReason } from "@workspace/vibefuel-core"
 
 export type Screen = "onboarding" | "signin" | "feed"
 

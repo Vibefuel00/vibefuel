@@ -3,7 +3,7 @@ import {
   decodeBase58,
   shortenAddress,
   validateSolanaAddress,
-} from "../../src/state/wallet"
+} from "../src/wallet"
 
 // Well known public keys: the System Program and the SPL Token program.
 const SYSTEM_PROGRAM = "11111111111111111111111111111111"

@@ -113,13 +113,15 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
 
 ## Mock mode and the API contract
 
-The backend is defined by [`api/openapi.yaml`](api/openapi.yaml) (OpenAPI 3.1).
-Client types are generated from it with `npm run generate:api`. Two adapters
-implement the same interface:
+The backend is defined by [`packages/vibefuel-core/api/openapi.yaml`](../../packages/vibefuel-core/api/openapi.yaml)
+(OpenAPI 3.1). Client types are generated from it with `npm run generate:api`
+in that package. The adapters, delivery policy and validation live in the
+shared `@workspace/vibefuel-core` package so the Claude Code plugin uses the
+same code and the same balance. Two adapters implement one interface:
 
 - **MockAdapter** (default): serves five clearly fictional ads from
-  [`media/mock-ads.json`](media/mock-ads.json), keeps the balance locally and
-  logs events to the Vibefuel output channel.
+  [`packages/vibefuel-core/data/mock-ads.json`](../../packages/vibefuel-core/data/mock-ads.json),
+  keeps the balance locally and logs events to the Vibefuel output channel.
 - **HttpAdapter**: used when `vibefuel.apiBaseUrl` is set. If the host cannot be
   reached the sidebar shows an offline notice and retries quietly; no error
   dialogs are shown.

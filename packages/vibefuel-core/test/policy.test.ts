@@ -3,7 +3,7 @@ import {
   evaluatePolicy,
   normalizeFrequencyMinutes,
   type PolicyInput,
-} from "../../src/ads/policy"
+} from "../src/policy"
 
 const MINUTE = 60_000
 const T0 = 1_700_000_000_000

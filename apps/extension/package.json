@@ -177,7 +177,6 @@
     "lint": "eslint src test",
     "format": "prettier --write \"**/*.{ts,mjs,js,json,css,md,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,mjs,js,json,css,md,yaml}\"",
-    "generate:api": "openapi-typescript api/openapi.yaml -o src/api/generated/openapi.d.ts",
     "test": "npm run test:unit",
     "test:unit": "vitest run",
     "test:integration": "npm run build && tsc -p test/integration/tsconfig.json && node out/test/integration/runTest.js",
@@ -187,6 +186,7 @@
     "publish:openvsx": "ovsx publish dist/*.vsix"
   },
   "devDependencies": {
+    "@workspace/vibefuel-core": "*",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20",
     "@types/vscode": "1.90.0",
@@ -197,7 +197,6 @@
     "eslint-config-prettier": "^10.1.8",
     "glob": "^11.0.0",
     "mocha": "^12.0.2",
-    "openapi-typescript": "^7.13.0",
     "ovsx": "^1.2.0",
     "prettier": "^3.9.9",
     "typescript": "^5",

@@ -1,18 +1,22 @@
-import * as fs from "node:fs/promises"
-import * as vscode from "vscode"
 import {
   ApiRequestError,
   ApiUnavailableError,
+  EventBatcher,
   HttpAdapter,
+  MOCK_ADS,
   MockAdapter,
   UnauthorizedError,
-  type Ad,
+  describeWalletError,
+  evaluatePolicy,
+  shortenAddress,
+  validateAd,
+  validateSolanaAddress,
   type Balance,
+  type PolicyDecision,
   type VibefuelApi,
-} from "./api"
+} from "@workspace/vibefuel-core"
+import * as vscode from "vscode"
 import { ImpressionTracker } from "./ads/impression"
-import { evaluatePolicy, type PolicyDecision } from "./ads/policy"
-import { validateAd } from "./ads/validate"
 import {
   eventsAllowed,
   readConfig,
@@ -25,14 +29,8 @@ import {
   PRIVACY_URL,
   SCHEDULER_TICK_MS,
 } from "./constants"
-import { EventBatcher } from "./state/events"
 import type { Session } from "./state/session"
 import { Store, type PendingAuth } from "./state/store"
-import {
-  describeWalletError,
-  shortenAddress,
-  validateSolanaAddress,
-} from "./state/wallet"
 import type { AuthView, FeedState, FromWebview } from "./webview/messages"
 
 export interface ControllerHost {
@@ -50,7 +48,6 @@ export interface ControllerHost {
 export class Controller implements vscode.Disposable {
   private config: VibefuelConfig
   private api!: VibefuelApi
-  private mockAdsCache: Ad[] | null = null
   private readonly store: Store
   private readonly impressions: ImpressionTracker
   private batcher!: EventBatcher
@@ -619,34 +616,11 @@ export class Controller implements vscode.Disposable {
         },
       })
     } else {
-      const ads: Ad[] = []
-      const adapter = new MockAdapter(
-        ads,
+      this.api = new MockAdapter(
+        [...MOCK_ADS],
         this.host.globalState,
         this.host.output
       )
-      this.api = adapter
-      void this.loadMockAds().then((loaded) => ads.push(...loaded))
-    }
-  }
-
-  private async loadMockAds(): Promise<Ad[]> {
-    if (this.mockAdsCache) return this.mockAdsCache
-    const uri = vscode.Uri.joinPath(
-      this.host.extensionUri,
-      "media",
-      "mock-ads.json"
-    )
-    try {
-      const text = await fs.readFile(uri.fsPath, "utf8")
-      const parsed = JSON.parse(text) as unknown[]
-      this.mockAdsCache = parsed
-        .map((item) => validateAd(item, 0))
-        .filter((ad): ad is Ad => ad !== null)
-      return this.mockAdsCache
-    } catch (error) {
-      this.log(`Could not load mock ads: ${String(error)}`)
-      return []
     }
   }
 

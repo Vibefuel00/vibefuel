@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AdEvent, EventBatchResult } from "../../src/api/types"
-import { EventBatcher } from "../../src/state/events"
+import type { AdEvent, EventBatchResult } from "../src/types"
+import { EventBatcher } from "../src/events"
 
 function makeSink() {
   const batches: AdEvent[][] = []

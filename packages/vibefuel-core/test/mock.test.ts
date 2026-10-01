@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 import * as path from "node:path"
-import { MockAdapter, type MockStorage } from "../../src/api/mock"
-import type { Ad } from "../../src/api/types"
+import { MockAdapter, type MockStorage } from "../src/mock"
+import type { Ad } from "../src/types"
 
 function memoryStorage(): MockStorage {
   const map = new Map<string, unknown>()
@@ -17,7 +17,7 @@ function memoryStorage(): MockStorage {
 }
 
 const ads = JSON.parse(
-  readFileSync(path.resolve(process.cwd(), "media/mock-ads.json"), "utf8")
+  readFileSync(path.resolve(process.cwd(), "data/mock-ads.json"), "utf8")
 ) as Ad[]
 
 describe("MockAdapter", () => {

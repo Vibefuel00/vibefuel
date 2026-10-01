@@ -1,6 +1,6 @@
 import * as vscode from "vscode"
 import { COMMANDS } from "./constants"
-import type { Balance } from "./api/types"
+import type { Balance } from "@workspace/vibefuel-core"
 
 /**
  * Fuel icon plus balance. A small dot appears when a new sponsored message is

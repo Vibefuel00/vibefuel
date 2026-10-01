@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 import * as path from "node:path"
-import { validateAd } from "../../src/ads/validate"
+import { validateAd } from "../src/validate"
 
 const NOW = Date.parse("2026-06-01T00:00:00Z")
 const base = {
@@ -52,7 +52,7 @@ describe("validateAd", () => {
 
   it("every mock ad passes validation", () => {
     const ads = JSON.parse(
-      readFileSync(path.resolve(process.cwd(), "media/mock-ads.json"), "utf8")
+      readFileSync(path.resolve(process.cwd(), "data/mock-ads.json"), "utf8")
     ) as unknown[]
     expect(ads).toHaveLength(5)
     for (const ad of ads) expect(validateAd(ad, NOW)).not.toBeNull()

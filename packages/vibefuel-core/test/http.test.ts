@@ -3,8 +3,8 @@ import {
   ApiRequestError,
   ApiUnavailableError,
   UnauthorizedError,
-} from "../../src/api/client"
-import { HttpAdapter } from "../../src/api/http"
+} from "../src/client"
+import { HttpAdapter } from "../src/http"
 
 const client = {
   editor: "Visual Studio Code",

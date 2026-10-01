@@ -85,6 +85,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/go/{ad_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Record a click and redirect to the advertiser.
+         * @description Used by terminal surfaces where a link is printed as text. The device
+         *     token travels in the `t` query parameter because browsers do not send
+         *     headers for a plain link. The server records a `click` event and
+         *     answers with a 302 to the ad's `cta_url`.
+         */
+        get: operations["clickRedirect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/rewards/balance": {
         parameters: {
             query?: never;
@@ -129,8 +152,14 @@ export interface components {
     schemas: {
         /** @description The only environment data the extension collects. */
         ClientInfo: {
-            /** @description Editor application name as reported by the editor, e.g. `Visual Studio Code` or `Cursor`. */
+            /** @description Client application name, e.g. `Visual Studio Code`, `Cursor` or `Claude Code`. */
             editor: string;
+            /**
+             * @description Where the ad is rendered. `sidebar` impressions require 3 seconds
+             *     of focused visibility; `terminal` impressions count on display.
+             * @enum {string}
+             */
+            surface?: "sidebar" | "terminal";
             editor_version: string;
             extension_version: string;
         };
@@ -191,6 +220,13 @@ export interface components {
              * @description Optional 16:9 image.
              */
             image_url?: string;
+            /**
+             * Format: uri
+             * @description Optional tracked link (`GET /v1/go/{ad_id}`) for surfaces that
+             *     cannot send a click event themselves, such as a terminal. Clients
+             *     that do send click events open `cta_url` directly.
+             */
+            click_url?: string;
             /** @description Tokens credited on a qualified impression. */
             reward_tokens: number;
             /** Format: date-time */
@@ -396,6 +432,40 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    clickRedirect: {
+        parameters: {
+            query: {
+                /** @description Device token. */
+                t: string;
+                /** @description Session id. */
+                s?: string;
+            };
+            header?: never;
+            path: {
+                ad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the advertiser's `cta_url`. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ad. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             default: components["responses"]["Error"];
         };
     };

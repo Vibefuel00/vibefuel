@@ -12,7 +12,7 @@ import type {
 /** Minimal key/value persistence so the mock adapter does not import vscode. */
 export interface MockStorage {
   get<T>(key: string): T | undefined
-  update(key: string, value: unknown): Thenable<void>
+  update(key: string, value: unknown): PromiseLike<void>
 }
 
 export interface MockLogger {

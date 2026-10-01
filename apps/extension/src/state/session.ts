@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import * as vscode from "vscode"
-import type { ClientInfo } from "../api/types"
+import type { ClientInfo } from "@workspace/vibefuel-core"
 
 /** Per-editor-session facts. The session id rotates every activation. */
 export interface Session {

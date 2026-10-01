@@ -2,7 +2,7 @@ import * as vscode from "vscode"
 import {
   normalizeFrequencyMinutes,
   normalizeQuietPeriodMinutes,
-} from "./ads/policy"
+} from "@workspace/vibefuel-core"
 
 export interface VibefuelConfig {
   enabled: boolean

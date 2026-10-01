@@ -1,5 +1,5 @@
-import { EVENT_FLUSH_INTERVAL_MS, MAX_QUEUED_EVENTS } from "../constants"
-import type { AdEvent, AdEventType, EventBatchResult } from "../api/types"
+import { EVENT_FLUSH_INTERVAL_MS, MAX_QUEUED_EVENTS } from "./constants"
+import type { AdEvent, AdEventType, EventBatchResult } from "./types"
 
 export interface EventSink {
   postEvents(events: AdEvent[]): Promise<EventBatchResult>

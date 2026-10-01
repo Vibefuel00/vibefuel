@@ -1,4 +1,4 @@
-import type { Ad } from "../api/types"
+import type { Ad } from "./types"
 
 const LIMITS = {
   advertiser: 40,
@@ -42,6 +42,7 @@ export function validateAd(input: unknown, now = Date.now()): Ad | null {
 
   if (!isHttpsUrl(ad.cta_url)) return null
   if (ad.image_url !== undefined && !isHttpsUrl(ad.image_url)) return null
+  if (ad.click_url !== undefined && !isHttpsUrl(ad.click_url)) return null
 
   const reward = ad.reward_tokens
   if (typeof reward !== "number" || !Number.isFinite(reward) || reward < 0) {
@@ -63,5 +64,6 @@ export function validateAd(input: unknown, now = Date.now()): Ad | null {
     expires_at: ad.expires_at,
   }
   if (ad.image_url !== undefined) result.image_url = ad.image_url
+  if (ad.click_url !== undefined) result.click_url = ad.click_url
   return result
 }

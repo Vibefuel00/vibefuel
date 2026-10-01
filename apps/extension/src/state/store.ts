@@ -1,5 +1,5 @@
 import type * as vscode from "vscode"
-import type { Ad, Balance } from "../api/types"
+import type { Ad, Balance } from "@workspace/vibefuel-core"
 
 export interface PendingAuth {
   device_code: string

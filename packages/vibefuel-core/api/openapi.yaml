@@ -145,6 +145,47 @@ paths:
           $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
+  /v1/go/{ad_id}:
+    get:
+      tags: [events]
+      operationId: clickRedirect
+      summary: Record a click and redirect to the advertiser.
+      description: |
+        Used by terminal surfaces where a link is printed as text. The device
+        token travels in the `t` query parameter because browsers do not send
+        headers for a plain link. The server records a `click` event and
+        answers with a 302 to the ad's `cta_url`.
+      security: []
+      parameters:
+        - name: ad_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: t
+          in: query
+          required: true
+          description: Device token.
+          schema:
+            type: string
+        - name: s
+          in: query
+          required: false
+          description: Session id.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the advertiser's `cta_url`.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        "404":
+          description: Unknown ad.
+        default:
+          $ref: "#/components/responses/Error"
   /v1/rewards/balance:
     get:
       tags: [rewards]
@@ -239,8 +280,14 @@ components:
       properties:
         editor:
           type: string
-          description: Editor application name as reported by the editor, e.g. `Visual Studio Code` or `Cursor`.
+          description: Client application name, e.g. `Visual Studio Code`, `Cursor` or `Claude Code`.
           maxLength: 80
+        surface:
+          type: string
+          enum: [sidebar, terminal]
+          description: |
+            Where the ad is rendered. `sidebar` impressions require 3 seconds
+            of focused visibility; `terminal` impressions count on display.
         editor_version:
           type: string
           maxLength: 40
@@ -347,6 +394,14 @@ components:
           format: uri
           pattern: "^https://"
           description: Optional 16:9 image.
+        click_url:
+          type: string
+          format: uri
+          pattern: "^https://"
+          description: |
+            Optional tracked link (`GET /v1/go/{ad_id}`) for surfaces that
+            cannot send a click event themselves, such as a terminal. Clients
+            that do send click events open `cta_url` directly.
         reward_tokens:
           type: number
           minimum: 0

@@ -1,4 +1,4 @@
-import { HTTP_TIMEOUT_MS } from "../constants"
+import { HTTP_TIMEOUT_MS } from "./constants"
 import {
   ApiRequestError,
   ApiUnavailableError,
