@@ -7,6 +7,8 @@ import { recordEvents, type IncomingEvent } from "@/lib/ads"
 import { balanceFor, UUID_RE } from "@/lib/ext"
 import { rateLimit } from "@/lib/ratelimit"
 
+export const dynamic = "force-dynamic"
+
 type WireEvent = {
   id?: unknown
   ad_id?: unknown

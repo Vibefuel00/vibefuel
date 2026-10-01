@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation"
 
 import { SiteHeader } from "@/components/site-header"
-import { KeyPanel, PayoutButton, WalletForm } from "@/components/app/dashboard-forms"
+import {
+  KeyPanel,
+  PayoutButton,
+  WalletForm,
+} from "@/components/app/dashboard-forms"
 import { DashboardTabs } from "@/components/app/dashboard-tabs"
 import { currentDeveloper } from "@/lib/auth"
 import { env, tokensToSol } from "@/lib/env"
+import { LINKS } from "@/lib/links"
 import { IMPRESSION_COOLDOWN_HOURS } from "@/lib/ads"
 import { developerRecentEvents, developerStats, formatHours } from "@/lib/stats"
 
@@ -19,7 +24,10 @@ function isRecentlySeen(lastSeenAt: Date | null): boolean {
 export default async function DashboardPage() {
   const dev = await currentDeveloper()
   if (!dev) redirect("/dashboard/login")
-  const [stats, recent] = await Promise.all([developerStats(dev.id), developerRecentEvents(dev.id)])
+  const [stats, recent] = await Promise.all([
+    developerStats(dev.id),
+    developerRecentEvents(dev.id),
+  ])
   const maxTokens = Math.max(1, ...stats.days.map((d) => d.tokens))
   const maxSeconds = Math.max(1, ...stats.days.map((d) => d.seconds))
   const connected = isRecentlySeen(dev.lastSeenAt)
@@ -31,7 +39,9 @@ export default async function DashboardPage() {
         <div className="stat">
           <span className="stat-label">Balance</span>
           <span className="stat-value">{stats.balance.toLocaleString()}</span>
-          <span className="stat-sub">tokens · ≈ {tokensToSol(stats.balance).toFixed(4)} SOL</span>
+          <span className="stat-sub">
+            tokens · ≈ {tokensToSol(stats.balance).toFixed(4)} SOL
+          </span>
         </div>
         <div className="stat">
           <span className="stat-label">Hours of work</span>
@@ -40,7 +50,9 @@ export default async function DashboardPage() {
         </div>
         <div className="stat">
           <span className="stat-label">Impressions</span>
-          <span className="stat-value">{stats.impressions.toLocaleString()}</span>
+          <span className="stat-value">
+            {stats.impressions.toLocaleString()}
+          </span>
           <span className="stat-sub">sponsored messages seen</span>
         </div>
         <div className="stat">
@@ -57,12 +69,24 @@ export default async function DashboardPage() {
       <div className="two-col">
         <div className="panel">
           <h2 className="panel-title">Last 7 days</h2>
-          <div className="bars" role="img" aria-label="Tokens earned and hours worked per day over the last seven days">
+          <div
+            className="bars"
+            role="img"
+            aria-label="Tokens earned and hours worked per day over the last seven days"
+          >
             {stats.days.map((d) => (
               <div key={d.day} className="bar-col">
                 <div className="bar-track">
-                  <div className="bar bar-tokens" style={{ height: `${(d.tokens / maxTokens) * 100}%` }} title={`${d.tokens} tokens`} />
-                  <div className="bar bar-hours" style={{ height: `${(d.seconds / maxSeconds) * 100}%` }} title={formatHours(d.seconds)} />
+                  <div
+                    className="bar bar-tokens"
+                    style={{ height: `${(d.tokens / maxTokens) * 100}%` }}
+                    title={`${d.tokens} tokens`}
+                  />
+                  <div
+                    className="bar bar-hours"
+                    style={{ height: `${(d.seconds / maxSeconds) * 100}%` }}
+                    title={formatHours(d.seconds)}
+                  />
                 </div>
                 <span className="bar-label">{d.label}</span>
                 <span className="bar-value">{d.tokens}</span>
@@ -79,18 +103,22 @@ export default async function DashboardPage() {
           <h2 className="panel-title">Recent activity</h2>
           {recent.length === 0 ? (
             <p className="panel-text">
-              Nothing yet. Once the extension is set up, sponsored messages you see
-              will show up here with the tokens they earned.
+              Nothing yet. Once the extension is set up, sponsored messages you
+              see will show up here with the tokens they earned.
             </p>
           ) : (
             <ul className="activity">
               {recent.map((e) => (
                 <li key={e.id}>
-                  <span className={`activity-type type-${e.type}`}>{e.type}</span>
+                  <span className={`activity-type type-${e.type}`}>
+                    {e.type}
+                  </span>
                   <span className="activity-text">
                     <strong>{e.advertiser}</strong> · {e.headline}
                   </span>
-                  <span className="activity-reward">{e.reward > 0 ? `+${e.reward}` : ""}</span>
+                  <span className="activity-reward">
+                    {e.reward > 0 ? `+${e.reward}` : ""}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -110,7 +138,10 @@ export default async function DashboardPage() {
               ? `${stats.requested} tokens are queued for payout.`
               : `${stats.paid} tokens paid out so far.`}
           </p>
-          <PayoutButton balance={stats.balance} hasWallet={Boolean(dev.walletAddress)} />
+          <PayoutButton
+            balance={stats.balance}
+            hasWallet={Boolean(dev.walletAddress)}
+          />
         </div>
       </div>
     </div>
@@ -123,9 +154,9 @@ export default async function DashboardPage() {
           <span className="step-num">1</span>
           <h2 className="panel-title">See</h2>
           <p className="panel-text">
-            While your coding agent works, a sponsored card appears in the Vibefuel
-            panel. Never in your code, your completions, or your chat. One card at a
-            time, clearly labeled.
+            While your coding agent works, a sponsored card appears in the
+            Vibefuel panel. Never in your code, your completions, or your chat.
+            One card at a time, clearly labeled.
           </p>
         </div>
         <div className="panel">
@@ -133,8 +164,8 @@ export default async function DashboardPage() {
           <h2 className="panel-title">Earn</h2>
           <p className="panel-text">
             A card counts once it has been visible for three seconds with your
-            window focused. Each counted view credits the reward the advertiser set,
-            straight to your balance.
+            window focused. Each counted view credits the reward the advertiser
+            set, straight to your balance.
           </p>
         </div>
         <div className="panel">
@@ -152,38 +183,45 @@ export default async function DashboardPage() {
           <h2 className="panel-title">The rules</h2>
           <ul className="rules">
             <li>
-              <strong>One reward per advertiser every {IMPRESSION_COOLDOWN_HOURS} hours.</strong> You can
-              see the same card again sooner, but it only pays once per window.
+              <strong>
+                One reward per advertiser every {IMPRESSION_COOLDOWN_HOURS}{" "}
+                hours.
+              </strong>{" "}
+              You can see the same card again sooner, but it only pays once per
+              window.
             </li>
             <li>
-              <strong>Rewards come from a real budget.</strong> Advertisers pay in SOL up front.
-              When a campaign's budget is spent, it stops showing.
+              <strong>Rewards come from a real budget.</strong> Advertisers pay
+              in SOL up front. When a campaign's budget is spent, it stops
+              showing.
             </li>
             <li>
-              <strong>One token is {tokenSol.toFixed(4)} SOL.</strong> Balances show both so
-              there are no surprises at payout.
+              <strong>One token is {tokenSol.toFixed(4)} SOL.</strong> Balances
+              show both so there are no surprises at payout.
             </li>
             <li>
-              <strong>Clicking is optional.</strong> You earn for seeing, not clicking. Dismissing
-              a card is fine too.
+              <strong>Clicking is optional.</strong> You earn for seeing, not
+              clicking. Dismissing a card is fine too.
             </li>
             <li>
-              <strong>Pause any time.</strong> Turn Vibefuel off in the extension and nothing is
-              shown or sent.
+              <strong>Pause any time.</strong> Turn Vibefuel off in the
+              extension and nothing is shown or sent.
             </li>
           </ul>
         </div>
         <div className="panel">
           <h2 className="panel-title">What leaves your machine</h2>
-          <p className="panel-text">Only these, and only while Vibefuel is on:</p>
+          <p className="panel-text">
+            Only these, and only while Vibefuel is on:
+          </p>
           <ul className="rules">
             <li>A heartbeat with your editor name and active minutes.</li>
             <li>Which cards were shown, clicked, or dismissed.</li>
             <li>Your serial key, to tie those to this dashboard.</li>
           </ul>
           <p className="panel-text">
-            Never file contents, file names, prompts, completions, chat, keystrokes,
-            or git remotes.
+            Never file contents, file names, prompts, completions, chat,
+            keystrokes, or git remotes.
           </p>
         </div>
       </div>
@@ -196,8 +234,8 @@ export default async function DashboardPage() {
         <div className="panel">
           <h2 className="panel-title">Your extension key</h2>
           <p className="panel-text">
-            Paste this into the Vibefuel extension. Treat it like a password: anyone
-            with it can earn to your balance.
+            Paste this into the Vibefuel extension. Treat it like a password:
+            anyone with it can earn to your balance.
           </p>
           <KeyPanel prefix={dev.keyPrefix} canReveal={Boolean(dev.keyEnc)} />
         </div>
@@ -205,8 +243,22 @@ export default async function DashboardPage() {
           <h2 className="panel-title">Install</h2>
           <ol className="steps">
             <li>
-              Install <strong>Vibefuel</strong> from the VS Code Marketplace or Open VSX
-              (Cursor and Windsurf use Open VSX).
+              Install <strong>Vibefuel</strong> from the{" "}
+              <a href={LINKS.marketplace} target="_blank" rel="noopener">
+                VS Code Marketplace
+              </a>{" "}
+              or{" "}
+              <a href={LINKS.openVsx} target="_blank" rel="noopener">
+                Open VSX
+              </a>{" "}
+              (Cursor and Windsurf), or open it directly in{" "}
+              <a href={LINKS.vscodeDeepLink}>VS Code</a> /{" "}
+              <a href={LINKS.cursorDeepLink}>Cursor</a>. For Claude Code, use
+              the{" "}
+              <a href={LINKS.claudeCodeRepo} target="_blank" rel="noopener">
+                plugin
+              </a>
+              .
             </li>
             <li>Open the Vibefuel panel from the activity bar.</li>
             <li>Paste your key and opt in.</li>
@@ -229,8 +281,8 @@ export default async function DashboardPage() {
       <div className="panel panel-muted">
         <h2 className="panel-title">Building your own integration?</h2>
         <p className="panel-text">
-          The same key works as a Bearer token against the Vibefuel API. Endpoints
-          and the event rules are documented in the repo under{" "}
+          The same key works as a Bearer token against the Vibefuel API.
+          Endpoints and the event rules are documented in the repo under{" "}
           <code className="inline-code">docs/extension-api.md</code>. Base URL:{" "}
           <code className="inline-code">{env.appUrl}</code>.
         </p>

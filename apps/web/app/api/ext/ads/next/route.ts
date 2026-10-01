@@ -3,6 +3,8 @@ import { json, tooMany, unauthorized } from "@/lib/api"
 import { rateLimit } from "@/lib/ratelimit"
 import { nextAdFor } from "@/lib/ads"
 
+export const dynamic = "force-dynamic"
+
 /** Returns the next eligible sponsored message, or 204 when there is none. */
 export async function GET(request: Request) {
   const dev = await developerFromBearer(request)

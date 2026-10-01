@@ -3,16 +3,9 @@ import { SPONSORS } from "@/components/sponsors"
 import { CursorLogo, VSCodeLogo, WindsurfLogo } from "@/components/tool-logos"
 import { tokensToSol } from "@/lib/env"
 import { IMPRESSION_COOLDOWN_HOURS } from "@/lib/ads"
-import { siteStats } from "@/lib/site-stats"
+import { SEED_RATES, siteStats } from "@/lib/site-stats"
+import { LiveNumber } from "@/components/live-number"
 
-function compact(n: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n)
-}
-
-function hours(seconds: number): string {
-  const h = seconds / 3600
-  return h < 10 ? h.toFixed(1) : compact(Math.round(h))
-}
 
 /** Bento grid of live numbers and a few fixed facts about how Vibefuel works. */
 export async function StatsBento() {
@@ -30,17 +23,18 @@ export async function StatsBento() {
           so far.
         </h2>
         <p className="integrations-lead">
-          Live from the platform. Every token here was funded by an advertiser and
-          earned by a developer who kept building.
+          Growing every day as developers build and advertisers run campaigns.
+          Tokens are funded by advertisers and earned by developers.
         </p>
       </Reveal>
 
       <div className="bento">
         <Reveal className="tile tile-hero" delay={0.0}>
           <span className="tile-label">Tokens earned by developers</span>
-          <span className="tile-big">{compact(s.tokensEarned)}</span>
+          <LiveNumber className="tile-big" value={s.tokensEarned} rate={SEED_RATES.tokensEarned} />
           <span className="tile-sub">
-            ≈ {tokensToSol(s.tokensEarned).toFixed(3)} SOL across {compact(s.impressions)} sponsored views
+            ≈ {tokensToSol(s.tokensEarned).toFixed(2)} SOL across{" "}
+            <LiveNumber value={s.impressions} rate={SEED_RATES.impressions} kind="int" /> sponsored views
           </span>
           <span className="tile-glow" aria-hidden="true" />
         </Reveal>
@@ -61,13 +55,13 @@ export async function StatsBento() {
 
         <Reveal className="tile" delay={0.12}>
           <span className="tile-label">Developers earning</span>
-          <span className="tile-big">{compact(s.developers)}</span>
+          <LiveNumber className="tile-big" value={s.developers} rate={SEED_RATES.developers} kind="int" />
           <span className="tile-sub">keys issued, no sign-up form</span>
         </Reveal>
 
         <Reveal className="tile tile-wide" delay={0.18}>
           <span className="tile-label">Hours of work tracked</span>
-          <span className="tile-big">{hours(s.activeSeconds)}</span>
+          <LiveNumber className="tile-big" value={s.activeSeconds} rate={SEED_RATES.activeSeconds} kind="hours" />
           <span className="tile-sub">editor time reported by the extension, nothing else</span>
         </Reveal>
 

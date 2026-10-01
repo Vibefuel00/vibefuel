@@ -5,6 +5,8 @@ import { developerFromBearer } from "@/lib/auth"
 import { badRequest, json, readJson, tooMany, unauthorized } from "@/lib/api"
 import { rateLimit } from "@/lib/ratelimit"
 
+export const dynamic = "force-dynamic"
+
 type Body = { editor?: unknown; extension_version?: unknown; active_seconds?: unknown }
 
 /** Sent by a client about once a minute while the editor window is focused. */

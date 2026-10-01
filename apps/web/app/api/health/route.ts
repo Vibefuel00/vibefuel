@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm"
 
 import { db } from "@/db"
 
+export const dynamic = "force-dynamic"
+
 /** Liveness + database check for the platform health probe. */
 export async function GET() {
   try {

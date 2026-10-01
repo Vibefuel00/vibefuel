@@ -15,15 +15,19 @@ injected into your editor, your chat, your completions or your terminal.
 ### VS Code
 
 1. Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-2. Search for **Vibefuel** and click **Install**.
-3. Or from a VSIX: `code --install-extension vibefuel-0.1.0.vsix`.
+2. Search for **Vibefuel** and click **Install**, or open
+   https://marketplace.visualstudio.com/items?itemName=vibefuel.vibefuel.
+3. Or from a VSIX from the
+   [releases page](https://github.com/Vibefuel00/vibefuel/releases):
+   `code --install-extension vibefuel-0.1.0.vsix`.
 
 ### Cursor
 
 Cursor installs extensions from Open VSX, where Vibefuel is also published.
 
 1. Open the Extensions view in Cursor.
-2. Search for **Vibefuel** and click **Install**.
+2. Search for **Vibefuel** and click **Install**, or open
+   https://open-vsx.org/extension/vibefuel/vibefuel.
 3. Or from a VSIX: Extensions view → `…` menu → **Install from VSIX…**, or run
    `cursor --install-extension vibefuel-0.1.0.vsix`.
 
