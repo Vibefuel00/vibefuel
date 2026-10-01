@@ -25,9 +25,11 @@ Optionally, your balance shows in the status line: `⛽ 128 FUEL · ● new`.
 ## Install
 
 ```
-/plugin marketplace add KhepriDev/code-earn
-/plugin install vibefuel@vibefuel
+claude plugin marketplace add vibefuel/vibefuel-claude-code
+claude plugin install vibefuel@vibefuel
 ```
+
+Or from inside a session: `/plugin install vibefuel --marketplace vibefuel/vibefuel-claude-code`.
 
 Then opt in. Nothing runs before this step:
 
@@ -105,6 +107,17 @@ Set `VIBEFUEL_HOME` to use a scratch state directory, and
 
 The shared client code (contract, adapters, policy, validation) lives in
 `packages/vibefuel-core` and is the same code the VS Code extension uses.
+
+### Publishing
+
+The plugin is published from its own repository, generated from this folder:
+
+```bash
+node scripts/export.mjs ../../../vibefuel-claude-code --repo vibefuel/vibefuel-claude-code
+cd ../../../vibefuel-claude-code && git add -A && git commit -m "vibefuel 0.1.0" && git push
+```
+
+Bump `version` in `.claude-plugin/plugin.json` before each release.
 
 ## License
 

@@ -4,7 +4,7 @@
   "description": "A short, clearly labelled sponsored line after a task finishes, never mid-task. Earn Solana tokens toward your next AI credits on the same balance as the Vibefuel editor extension.",
   "author": { "name": "Vibefuel", "url": "https://vibefuel.app" },
   "homepage": "https://vibefuel.app",
-  "repository": "https://github.com/KhepriDev/code-earn",
+  "repository": "https://github.com/vibefuel/vibefuel-claude-code",
   "license": "MIT",
   "keywords": ["vibefuel", "solana", "rewards", "sponsored", "terminal"]
 }
