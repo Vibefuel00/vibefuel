@@ -141,6 +141,10 @@
           text: "An anonymous device id, ad events, editor name and version, and the extension version. Nothing about your code, files, prompts or git.",
         }),
       ]),
+      el("div", {
+        className: "notice",
+        text: "Tip: drag the Vibefuel icon from the Activity Bar into the Secondary Side Bar to keep this view open next to your AI agent panel while it works.",
+      }),
       el("div", { className: "row" }, [
         button("Opt in and start", () => post({ type: "optIn" }), "primary"),
       ]),
@@ -316,6 +320,12 @@
     }
 
     children.push(s.ad && !s.paused ? renderCard(s) : renderEmpty(s))
+    children.push(
+      el("p", {
+        className: "small muted",
+        text: "Keep this view beside your agent panel: drag the Vibefuel icon into the Secondary Side Bar.",
+      })
+    )
 
     const balance = s.balance || { pending: 0, settled: 0, currency: "tokens" }
     children.push(
