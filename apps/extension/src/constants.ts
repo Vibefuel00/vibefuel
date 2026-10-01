@@ -6,7 +6,7 @@ export const OUTPUT_CHANNEL_NAME = "Vibefuel"
  * Public landing page. The site lives in `apps/web` of this monorepo; the
  * production hostname is not final, so this is the single place to change it.
  */
-export const LANDING_URL = "https://vibefuel.dev"
+export const LANDING_URL = "https://vibefuel.app"
 export const PRIVACY_URL = `${LANDING_URL}/privacy`
 
 /** Seconds a card must stay visible with the window focused before an impression counts. */
