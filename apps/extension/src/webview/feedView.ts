@@ -62,9 +62,13 @@ export class FeedViewProvider implements vscode.WebviewViewProvider {
     const view = this.view
     if (!view) return
     const state = this.delegate.getState()
-    const origins = state.ad?.image_url
-      ? [new URL(state.ad.image_url).origin]
-      : []
+    const origins = [
+      ...new Set(
+        [state.ad?.image_url, state.ad?.logo_url]
+          .filter((u): u is string => typeof u === "string")
+          .map((u) => new URL(u).origin)
+      ),
+    ]
     const key = origins.join(" ")
     if (force || key !== this.renderedOrigins) {
       this.renderedOrigins = key

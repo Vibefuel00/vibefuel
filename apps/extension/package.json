@@ -77,6 +77,11 @@
         "category": "Vibefuel"
       },
       {
+        "command": "vibefuel.signIn",
+        "title": "Sign In with Serial Key",
+        "category": "Vibefuel"
+      },
+      {
         "command": "vibefuel.pause",
         "title": "Pause",
         "category": "Vibefuel"
@@ -109,6 +114,10 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "vibefuel.signIn",
+          "when": "vibefuel.enabled && !vibefuel.signedIn"
+        },
         {
           "command": "vibefuel.pause",
           "when": "vibefuel.enabled && !vibefuel.paused"
@@ -158,13 +167,13 @@
         },
         "vibefuel.apiBaseUrl": {
           "type": "string",
-          "default": "",
-          "description": "Base URL of the Vibefuel API. Leave empty to run in mock mode with local fictional ads."
+          "default": "https://vibefuel.app",
+          "description": "Vibefuel API host. Set to \"mock\" to run offline with local fictional ads and no network."
         },
         "vibefuel.telemetry": {
           "type": "boolean",
           "default": true,
-          "description": "Send ad events (impression, click, dismiss) so impressions can be rewarded. Always off when editor telemetry is disabled."
+          "description": "Send ad events and a once-a-minute active-time heartbeat so views can be rewarded. Always off when editor telemetry is disabled."
         }
       }
     }

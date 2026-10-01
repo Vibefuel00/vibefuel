@@ -63,9 +63,9 @@
   const PRIVACY = {
     collected: [
       "An anonymous device id",
+      "Your serial key, stored hashed on the server",
       "Ad events: impression, click, dismiss",
-      "Editor name and version",
-      "Extension version",
+      "A once-a-minute heartbeat while the window is focused: editor name, extension version, active seconds",
     ],
     never: [
       "File contents, file names, project names or paths",
@@ -160,60 +160,54 @@
   // ------------------------------------------------------------- sign in
 
   function renderSignIn(s) {
-    const auth = s.auth
-    const children = [el("h1", { text: "Sign in this device" })]
+    const children = [el("h1", { text: "Sign in with your key" })]
     if (s.offline) {
       children.push(
         el("div", {
           className: "notice warn",
-          text: "Vibefuel is offline. The API could not be reached. Sign-in will resume when it is back.",
+          text: "Vibefuel is offline. The API could not be reached; it retries quietly in the background.",
         })
       )
     }
-    if (!auth) {
+    if (s.mode === "mock") {
       children.push(
         el("p", {
           className: "small muted",
-          text:
-            s.mode === "mock"
-              ? "Mock mode: a local device id is generated and no events are sent anywhere."
-              : "Sign in with a short code in your browser. No password is typed in the editor.",
+          text: "Mock mode: no key needed. Fictional ads, nothing is sent anywhere.",
         }),
-        button("Sign in", () => post({ type: "signIn" }), "primary")
+        button(
+          s.signingIn ? "Signing in…" : "Continue in mock mode",
+          () => post({ type: "signIn" }),
+          "primary",
+          { disabled: s.signingIn }
+        )
       )
-    } else if (auth.status === "waiting") {
+    } else {
       children.push(
         el("p", {
           className: "small",
-          text: "Enter this code in your browser:",
+          text: "Create a free serial key on vibefuel.app, then paste it here. No email, no password. The key links this editor to your dashboard.",
         }),
-        el("div", { className: "code", text: auth.userCode }),
         el("div", { className: "row" }, [
           button(
-            "Open browser",
-            () => post({ type: "openVerification" }),
-            "primary"
+            s.signingIn ? "Checking key…" : "Paste key",
+            () => post({ type: "signIn" }),
+            "primary",
+            { disabled: s.signingIn }
           ),
-          button("Start over", () => post({ type: "restartAuth" }), ""),
+          button("Get a key", () => post({ type: "getKey" }), ""),
         ]),
-        el("p", { className: "small muted", text: "Waiting for approval…" })
-      )
-    } else {
-      const text =
-        auth.status === "expired"
-          ? "That code expired."
-          : auth.status === "denied"
-            ? "Sign-in was declined in the browser."
-            : "Could not start sign-in."
-      children.push(
-        el("div", { className: "notice warn", text: text }),
-        button("Try again", () => post({ type: "restartAuth" }), "primary")
+        el("p", {
+          className: "small muted",
+          text: "Paste key opens a secure input. The key is stored in your editor's secret storage and never shown again.",
+        })
       )
     }
     children.push(
       el("div", { className: "row" }, [
         button("Opt out", () => post({ type: "optOut" }), "link"),
       ]),
+      privacyDetails(),
       footer(s)
     )
     return children
@@ -224,9 +218,16 @@
   function renderCard(s) {
     const ad = s.ad
     const card = el("article", {
-      className: "card" + (ad.id !== lastAdId ? " enter" : ""),
+      className:
+        "card" +
+        (ad.id !== lastAdId ? " enter" : "") +
+        (ad.brand_bg && ad.brand_fg ? " branded" : ""),
       "aria-label": "Sponsored message from " + ad.advertiser,
     })
+    if (ad.brand_bg && ad.brand_fg) {
+      card.style.setProperty("--vf-brand-bg", ad.brand_bg)
+      card.style.setProperty("--vf-brand-fg", ad.brand_fg)
+    }
     if (ad.image_url) {
       card.appendChild(
         el("img", {
@@ -241,7 +242,21 @@
       el("div", { className: "card-body" }, [
         el("div", { className: "row between" }, [
           el("span", { className: "sponsored", text: "Sponsored" }),
-          el("span", { className: "advertiser", text: ad.advertiser }),
+          el("span", { className: "row" }, [
+            ad.logo_url
+              ? el("img", {
+                  className: "logo",
+                  src: ad.logo_url,
+                  alt: "",
+                  width: "18",
+                  height: "18",
+                })
+              : null,
+            el("span", {
+              className: "advertiser",
+              text: ad.advertiser + (ad.domain ? " · " + ad.domain : ""),
+            }),
+          ]),
         ]),
         el("h3", { text: ad.headline }),
         el("p", { className: "body", text: ad.body }),
@@ -339,7 +354,7 @@
             }),
             el("div", {
               className: "label",
-              text: "Pending " + balance.currency,
+              text: "Balance · " + balance.currency,
             }),
           ]),
           el("div", { className: "stat" }, [
@@ -349,14 +364,15 @@
             }),
             el("div", {
               className: "label",
-              text: "Settled " + balance.currency,
+              text: "Paid out · " + balance.currency,
             }),
           ]),
         ]),
-        el("p", {
-          className: "small muted",
-          text: "Put settled tokens toward your next AI credits.",
-        }),
+        el("p", { className: "small muted" }, [
+          "Put tokens toward your next AI credits. Payouts start at 100 tokens from your ",
+          button("dashboard", () => post({ type: "openDashboard" }), "link"),
+          s.keyPrefix ? " · key " + s.keyPrefix : "",
+        ]),
       ])
     )
 

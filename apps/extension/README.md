@@ -41,19 +41,23 @@ both editors.
 1. **Opt in.** On first launch the Vibefuel view opens with a plain explanation
    of what is shown, collected and earned. Nothing runs until you click
    **Opt in**. Opting out is one click in the same view and clears all state.
-2. **Sign in.** A short device code is shown in the sidebar; approve it in your
-   browser. In mock mode (the default) a local device id is generated instead.
+2. **Sign in with your key.** Create a free serial key at
+   [vibefuel.app](https://vibefuel.app) (no email, no password) and paste it
+   when the extension asks. The key is stored in your editor's secret storage
+   and links this editor to your dashboard.
 3. **Sponsored cards.** At most one new card every 30 minutes, none in the first
    10 minutes of a session, none while debugging, none while the window is not
    focused, none while paused.
 4. **Earn.** A view counts after the card has been visible for 3 continuous
    seconds with the window focused. The reward is shown on every card as
    **Earn N tokens**. Clicking the CTA opens the advertiser in your browser;
-   nothing is ever auto-opened. **Not interested** dismisses the card.
-5. **Wallet.** Link a Solana public address to receive settled tokens. Vibefuel
-   validates the base58 address and stores only that address in the editor's
-   SecretStorage. It never asks for, reads or stores private keys or seed
-   phrases.
+   nothing is ever auto-opened. **Not interested** dismisses the card. The
+   server rewards each advertiser at most once every 6 hours and only from a
+   funded campaign budget.
+5. **Wallet.** Link a Solana public address to receive payouts. Vibefuel
+   validates the base58 address and sends only that public address to your
+   account. It never asks for, reads or stores private keys or seed phrases.
+   Payouts start at 100 tokens from your dashboard.
 
 Tokens can be put toward your next AI credits. Vibefuel does not buy credits on
 your behalf and does not claim to cover your costs.
@@ -87,10 +91,12 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
 
 **Collected**
 
-- An anonymous device id
-- Ad events: impression, click and dismiss, each with the ad id, a timestamp
-  and a random per-session id
-- Editor name and version
+- Your serial key, to tie events to your dashboard. Stored hashed on the server.
+- Ad events: impression, click and dismiss, each with the campaign id, a
+  timestamp and a random per-session id
+- A heartbeat about once a minute while the editor window is focused: editor
+  name, extension version and active seconds. Shown as hours of work on your
+  dashboard.
 - Extension version
 
 **Never collected**
@@ -108,8 +114,10 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
   events are sent at all. The sidebar tells you that views cannot be rewarded.
 - Only a Solana public address is stored, in the editor's SecretStorage. You can
   unlink it at any time.
-- In mock mode no events or ids are sent anywhere; they are written to the
-  **Vibefuel** output channel. Card images still load from their https URL.
+- In mock mode (`vibefuel.apiBaseUrl` set to `mock`) no events or ids are sent
+  anywhere; they are written to the **Vibefuel** output channel. Card images
+  still load from their https URL.
+- The full summary is at [vibefuel.app/privacy](https://vibefuel.app/privacy).
 
 ## Mock mode and the API contract
 
@@ -119,12 +127,12 @@ in that package. The adapters, delivery policy and validation live in the
 shared `@workspace/vibefuel-core` package so the Claude Code plugin uses the
 same code and the same balance. Two adapters implement one interface:
 
-- **MockAdapter** (default): serves five clearly fictional ads from
+- **MockAdapter** (`vibefuel.apiBaseUrl` = `mock`): serves five clearly fictional ads from
   [`packages/vibefuel-core/data/mock-ads.json`](../../packages/vibefuel-core/data/mock-ads.json),
   keeps the balance locally and logs events to the Vibefuel output channel.
-- **HttpAdapter**: used when `vibefuel.apiBaseUrl` is set. If the host cannot be
-  reached the sidebar shows an offline notice and retries quietly; no error
-  dialogs are shown.
+- **HttpAdapter** (default, `https://vibefuel.app`): the web app in `apps/web`
+  serves the contract. If the host cannot be reached the sidebar shows an
+  offline notice and retries quietly; no error dialogs are shown.
 
 ## Development
 

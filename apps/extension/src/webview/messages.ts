@@ -2,12 +2,6 @@ import type { Ad, Balance, PolicyBlockReason } from "@workspace/vibefuel-core"
 
 export type Screen = "onboarding" | "signin" | "feed"
 
-export interface AuthView {
-  userCode: string
-  verificationUri: string
-  status: "waiting" | "expired" | "denied" | "error"
-}
-
 /** Everything the webview needs to render. The extension owns all state. */
 export interface FeedState {
   screen: Screen
@@ -19,14 +13,15 @@ export interface FeedState {
   adDeliveredAt: number | null
   impressionCounted: boolean
   balance: Balance | null
+  keyPrefix: string | null
   wallet: string | null
-  walletSyncPending: boolean
-  auth: AuthView | null
+  signingIn: boolean
   offline: boolean
   eventsBlocked: "editor" | "setting" | null
   blockReason: PolicyBlockReason | null
   nextEligibleAt: number | null
   landingUrl: string
+  startUrl: string
 }
 
 export type ToWebview = { type: "state"; state: FeedState } | { type: "ping" }
@@ -40,8 +35,8 @@ export type FromWebview =
   | { type: "cta"; adId: string }
   | { type: "dismiss"; adId: string }
   | { type: "signIn" }
-  | { type: "openVerification" }
-  | { type: "restartAuth" }
+  | { type: "getKey" }
+  | { type: "openDashboard" }
   | { type: "linkWallet" }
   | { type: "unlinkWallet" }
   | { type: "signOut" }

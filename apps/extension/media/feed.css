@@ -195,6 +195,32 @@ button[disabled] {
   }
 }
 
+/* Advertiser branding: the card takes the campaign's colors; the Sponsored
+   label and CTA keep the Vibefuel orange. */
+.card.branded {
+  background: var(--vf-brand-bg);
+  color: var(--vf-brand-fg);
+  border-color: transparent;
+}
+.card.branded h3,
+.card.branded .body {
+  color: var(--vf-brand-fg);
+}
+.card.branded .advertiser,
+.card.branded .reward,
+.card.branded .card-actions .link {
+  color: var(--vf-brand-fg);
+  opacity: 0.72;
+}
+.card .logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 .card-image {
   width: 100%;
   aspect-ratio: 16 / 9;

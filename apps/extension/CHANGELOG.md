@@ -5,6 +5,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Sign in with a serial key from vibefuel.app instead of a device code.
+- The API defaults to `https://vibefuel.app`; `mock` selects offline mode.
+- Cards use the advertiser's brand colors and logo when provided.
+- Once-a-minute active-time heartbeat while focused, shown as hours of work on the dashboard.
+- Balance shows available and paid-out tokens; payouts happen from the dashboard.
+
 ## [0.1.0] - 2026-09-30
 
 ### Added

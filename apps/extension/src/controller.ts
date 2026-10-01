@@ -10,8 +10,10 @@ import {
   evaluatePolicy,
   shortenAddress,
   validateAd,
+  validateSerialKey,
   validateSolanaAddress,
   type Balance,
+  type Me,
   type PolicyDecision,
   type VibefuelApi,
 } from "@workspace/vibefuel-core"
@@ -25,13 +27,15 @@ import {
 } from "./config"
 import {
   FETCH_BACKOFF_MS,
+  HEARTBEAT_INTERVAL_MS,
   LANDING_URL,
   PRIVACY_URL,
   SCHEDULER_TICK_MS,
+  START_URL,
 } from "./constants"
 import type { Session } from "./state/session"
-import { Store, type PendingAuth } from "./state/store"
-import type { AuthView, FeedState, FromWebview } from "./webview/messages"
+import { Store } from "./state/store"
+import type { FeedState, FromWebview } from "./webview/messages"
 
 export interface ControllerHost {
   extensionUri: vscode.Uri
@@ -55,20 +59,19 @@ export class Controller implements vscode.Disposable {
   readonly onDidChange = this.onChangeEmitter.event
   private readonly disposables: vscode.Disposable[] = []
 
-  private viewVisible = false
   private offline = false
   private signedIn = false
-  private authView: AuthView | null = null
-  private authPoll: NodeJS.Timeout | null = null
+  private signingIn = false
+  private me: Me | null = null
   private tick: NodeJS.Timeout | null = null
+  private heartbeat: NodeJS.Timeout | null = null
+  private focusedSince: number | null = null
   private nextFetchNotBefore = 0
-  private nextAuthRetryAt = 0
   private lastDecision: PolicyDecision = {
     allowed: false,
     reason: "disabled",
     retryAt: null,
   }
-  private walletCache: string | null = null
   private dismissed = new Set<string>()
 
   constructor(private readonly host: ControllerHost) {
@@ -86,6 +89,7 @@ export class Controller implements vscode.Disposable {
       }),
       vscode.window.onDidChangeWindowState((state) => {
         this.impressions.setFocused(state.focused)
+        this.focusedSince = state.focused ? Date.now() : null
         this.evaluate()
       }),
       vscode.debug.onDidStartDebugSession(() => this.evaluate()),
@@ -93,24 +97,27 @@ export class Controller implements vscode.Disposable {
       vscode.env.onDidChangeTelemetryEnabled(() => this.changed())
     )
     this.impressions.setFocused(vscode.window.state.focused)
+    this.focusedSince = vscode.window.state.focused ? Date.now() : null
   }
 
   // ---------------------------------------------------------------- lifecycle
 
   async start(): Promise<void> {
-    this.walletCache = (await this.store.getWalletAddress()) ?? null
+    this.me = this.store.me
     await this.syncContextKeys()
-    if (this.config.enabled) {
-      await this.ensureSignedIn()
-    }
+    if (this.config.enabled) await this.ensureSignedIn()
     this.tick = setInterval(() => void this.onTick(), SCHEDULER_TICK_MS)
+    this.heartbeat = setInterval(
+      () => void this.onHeartbeat(),
+      HEARTBEAT_INTERVAL_MS
+    )
     void this.onTick()
     this.changed()
   }
 
   dispose(): void {
     if (this.tick) clearInterval(this.tick)
-    this.stopAuthPolling()
+    if (this.heartbeat) clearInterval(this.heartbeat)
     this.impressions.dispose()
     this.batcher.dispose()
     this.onChangeEmitter.dispose()
@@ -137,11 +144,11 @@ export class Controller implements vscode.Disposable {
   }
 
   get balance(): Balance | null {
-    return this.store.balance
+    return this.me?.balance ?? null
   }
 
   get walletLinked(): boolean {
-    return this.walletCache !== null
+    return !!this.me?.wallet_address
   }
 
   getFeedState(): FeedState {
@@ -162,10 +169,12 @@ export class Controller implements vscode.Disposable {
       ad: showAd?.ad ?? null,
       adDeliveredAt: showAd?.deliveredAt ?? null,
       impressionCounted: showAd?.impressionCounted ?? false,
-      balance: this.store.balance,
-      wallet: this.walletCache ? shortenAddress(this.walletCache) : null,
-      walletSyncPending: this.store.walletSyncPending,
-      auth: this.authView,
+      balance: this.balance,
+      keyPrefix: this.me?.key_prefix ?? null,
+      wallet: this.me?.wallet_address
+        ? shortenAddress(this.me.wallet_address)
+        : null,
+      signingIn: this.signingIn,
       offline: this.offline,
       eventsBlocked: !vscode.env.isTelemetryEnabled
         ? "editor"
@@ -177,13 +186,13 @@ export class Controller implements vscode.Disposable {
         ? null
         : this.lastDecision.retryAt,
       landingUrl: LANDING_URL,
+      startUrl: START_URL,
     }
   }
 
   onViewVisibilityChanged(visible: boolean): void {
-    this.viewVisible = visible
     this.impressions.setVisible(visible)
-    if (visible) void this.refreshBalance()
+    if (visible) void this.refreshMe()
   }
 
   // --------------------------------------------------------------- messages
@@ -213,15 +222,10 @@ export class Controller implements vscode.Disposable {
         await this.dismiss(message.adId)
         return
       case "signIn":
-      case "restartAuth":
-        await this.ensureSignedIn(true)
+        await this.signIn()
         return
-      case "openVerification":
-        if (this.authView) {
-          await vscode.env.openExternal(
-            vscode.Uri.parse(this.authView.verificationUri)
-          )
-        }
+      case "getKey":
+        await vscode.env.openExternal(vscode.Uri.parse(START_URL))
         return
       case "linkWallet":
         await this.linkWallet()
@@ -238,6 +242,11 @@ export class Controller implements vscode.Disposable {
       case "openPrivacy":
         await vscode.env.openExternal(vscode.Uri.parse(PRIVACY_URL))
         return
+      case "openDashboard":
+        await vscode.env.openExternal(
+          vscode.Uri.parse(`${LANDING_URL}/dashboard`)
+        )
+        return
     }
   }
 
@@ -245,7 +254,6 @@ export class Controller implements vscode.Disposable {
 
   async optIn(): Promise<void> {
     await setEnabled(true)
-    // onDidChangeConfiguration will pick this up, but do it now for snappiness.
     this.config = readConfig()
     await this.store.setPaused(false)
     await this.syncContextKeys()
@@ -255,16 +263,14 @@ export class Controller implements vscode.Disposable {
 
   /** One click, clears everything Vibefuel stored. */
   async optOut(): Promise<void> {
-    this.stopAuthPolling()
     this.batcher.clear()
     this.impressions.reset()
     this.dismissed.clear()
     this.signedIn = false
-    this.authView = null
+    this.me = null
     this.offline = false
     await this.store.clearAll()
     if (this.api instanceof MockAdapter) await this.api.reset()
-    this.walletCache = null
     await setEnabled(false)
     this.config = readConfig()
     await this.syncContextKeys()
@@ -296,12 +302,80 @@ export class Controller implements vscode.Disposable {
     this.evaluate()
   }
 
+  /**
+   * Sign in with a serial key from vibefuel.app. In mock mode the key is not
+   * needed: the mock adapter accepts the device as is.
+   */
+  async signIn(): Promise<void> {
+    if (!this.config.enabled) return
+    if (this.api.mode === "mock") {
+      await this.store.setAccessToken("VF-MOCK-MOCK-MOCK-MOCK")
+      await this.finishSignIn()
+      return
+    }
+    const value = await vscode.window.showInputBox({
+      title: "Sign in to Vibefuel",
+      prompt: `Paste the serial key from ${LANDING_URL}. It links this editor to your dashboard.`,
+      placeHolder: "VF-XXXX-XXXX-XXXX-XXXX",
+      ignoreFocusOut: true,
+      password: true,
+      validateInput: (text) => {
+        const result = validateSerialKey(text)
+        return result.ok ? null : result.message
+      },
+    })
+    if (value === undefined) return
+    const result = validateSerialKey(value)
+    if (!result.ok) return
+    await this.store.setAccessToken(result.key)
+    await this.finishSignIn()
+  }
+
+  private async ensureSignedIn(): Promise<void> {
+    if (!this.config.enabled) return
+    if (await this.store.getAccessToken()) await this.finishSignIn()
+  }
+
+  /** Verify the stored key against the API and load the account summary. */
+  private async finishSignIn(): Promise<void> {
+    this.signingIn = true
+    this.changed()
+    try {
+      const me = await this.api.me()
+      this.me = me
+      await this.store.setMe(me)
+      this.signedIn = true
+      this.setOffline(false)
+      this.log(`Signed in as ${me.key_prefix} (${this.api.mode} mode).`)
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        await this.store.setAccessToken(null)
+        this.signedIn = false
+        this.me = null
+        void vscode.window.showWarningMessage(
+          "Vibefuel: that key was not accepted. Create one at vibefuel.app and try again."
+        )
+      } else if (error instanceof ApiUnavailableError) {
+        // Keep the key; treat the device as signed in with cached data and retry later.
+        this.signedIn = true
+        this.setOffline(true)
+        this.log(`Could not verify the key right now: ${error.message}`)
+      } else {
+        this.log(`Sign-in failed: ${describe(error)}`)
+      }
+    } finally {
+      this.signingIn = false
+      await this.syncContextKeys()
+      this.evaluate()
+    }
+  }
+
   async linkWallet(): Promise<void> {
     const value = await vscode.window.showInputBox({
       title: "Link Solana wallet",
       prompt:
         "Paste your Solana public address. Never paste a private key or seed phrase; Vibefuel will never ask for one.",
-      placeHolder: "e.g. 7xKX…  (32 to 44 base58 characters)",
+      placeHolder: "32 to 44 base58 characters",
       ignoreFocusOut: true,
       validateInput: (text) => {
         const result = validateSolanaAddress(text)
@@ -311,158 +385,44 @@ export class Controller implements vscode.Disposable {
     if (value === undefined) return
     const result = validateSolanaAddress(value)
     if (!result.ok) return
-    await this.store.setWalletAddress(result.address)
-    this.walletCache = result.address
-    await this.syncWallet()
-    await this.syncContextKeys()
-    this.changed()
+    try {
+      await this.api.linkWallet(result.address)
+      this.setOffline(false)
+      await this.refreshMe()
+      void vscode.window.showInformationMessage(
+        `Vibefuel: wallet ${shortenAddress(result.address)} linked.`
+      )
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        void vscode.window.showWarningMessage(`Vibefuel: ${error.message}`)
+      } else {
+        this.handleApiError(error, "link wallet")
+        void vscode.window.showWarningMessage(
+          "Vibefuel: could not reach the API. Try again in a moment."
+        )
+      }
+    }
   }
 
   async unlinkWallet(): Promise<void> {
-    await this.store.setWalletAddress(null)
-    this.walletCache = null
-    await this.store.setWalletSyncPending(false)
-    if (this.signedIn) {
-      try {
-        await this.api.unlinkWallet()
-        this.setOffline(false)
-      } catch (error) {
-        this.handleApiError(error, "unlink wallet")
-      }
+    try {
+      await this.api.unlinkWallet()
+      this.setOffline(false)
+      await this.refreshMe()
+    } catch (error) {
+      this.handleApiError(error, "unlink wallet")
     }
-    await this.syncContextKeys()
-    this.changed()
   }
 
   async signOut(): Promise<void> {
-    this.stopAuthPolling()
     this.batcher.clear()
     this.signedIn = false
-    this.authView = null
+    this.me = null
     await this.store.setAccessToken(null)
-    await this.store.setPendingAuth(null)
-    await this.store.setDeviceId(null)
+    await this.store.setMe(null)
+    await this.syncContextKeys()
     this.log("Signed out.")
     this.evaluate()
-  }
-
-  // ------------------------------------------------------------------- auth
-
-  /**
-   * Device code flow against the contract. In mock mode the adapter approves
-   * immediately and hands back a locally generated device id.
-   */
-  async ensureSignedIn(restart = false): Promise<void> {
-    if (!this.config.enabled) return
-    if (!restart && (await this.store.getAccessToken())) {
-      this.signedIn = true
-      this.authView = null
-      this.changed()
-      return
-    }
-    this.stopAuthPolling()
-    let pending: PendingAuth | null = restart ? null : this.store.pendingAuth
-    if (pending && pending.expires_at <= Date.now()) pending = null
-    if (!pending) {
-      try {
-        const res = await this.api.startDeviceAuth()
-        pending = {
-          device_code: res.device_code,
-          user_code: res.user_code,
-          verification_uri: res.verification_uri,
-          expires_at: Date.now() + res.expires_in * 1000,
-          interval_ms: Math.max(1, res.interval) * 1000,
-        }
-        if (res.verification_uri_complete) {
-          pending.verification_uri_complete = res.verification_uri_complete
-        }
-        await this.store.setPendingAuth(pending)
-        this.setOffline(false)
-      } catch (error) {
-        this.handleApiError(error, "start sign-in")
-        this.authView = {
-          userCode: "",
-          verificationUri: "",
-          status: "error",
-        }
-        this.changed()
-        return
-      }
-    }
-    this.authView = {
-      userCode: pending.user_code,
-      verificationUri:
-        pending.verification_uri_complete ?? pending.verification_uri,
-      status: "waiting",
-    }
-    this.changed()
-    this.pollAuth(pending)
-  }
-
-  private pollAuth(pending: PendingAuth): void {
-    let interval = pending.interval_ms
-    const poll = async (): Promise<void> => {
-      this.authPoll = null
-      if (Date.now() > pending.expires_at) {
-        this.authView = { ...this.authView!, status: "expired" }
-        await this.store.setPendingAuth(null)
-        this.changed()
-        return
-      }
-      try {
-        const result = await this.api.pollDeviceToken(pending.device_code)
-        this.setOffline(false)
-        if (result.status === "ok") {
-          await this.store.setAccessToken(result.token.access_token)
-          await this.store.setDeviceId(result.token.device_id)
-          await this.store.setPendingAuth(null)
-          this.signedIn = true
-          this.authView = null
-          this.log(`Signed in (${this.api.mode} mode).`)
-          await this.syncWallet()
-          await this.refreshBalance()
-          this.evaluate()
-          return
-        }
-        if (result.error === "slow_down") interval += 5000
-        if (result.error === "expired_token") {
-          this.authView = { ...this.authView!, status: "expired" }
-          await this.store.setPendingAuth(null)
-          this.changed()
-          return
-        }
-        if (result.error === "access_denied") {
-          this.authView = { ...this.authView!, status: "denied" }
-          await this.store.setPendingAuth(null)
-          this.changed()
-          return
-        }
-      } catch (error) {
-        this.handleApiError(error, "poll sign-in")
-        interval = Math.min(interval * 2, 60_000)
-      }
-      this.authPoll = setTimeout(() => void poll(), interval)
-    }
-    this.authPoll = setTimeout(
-      () => void poll(),
-      this.api.mode === "mock" ? 0 : interval
-    )
-  }
-
-  /** After an offline failure, retry sign-in quietly every few minutes. */
-  private async retrySignInIfOffline(): Promise<void> {
-    if (!this.config.enabled || this.signedIn || this.authPoll) return
-    if (this.authView?.status !== "error") return
-    if (Date.now() < this.nextAuthRetryAt) return
-    this.nextAuthRetryAt = Date.now() + FETCH_BACKOFF_MS
-    await this.ensureSignedIn(true)
-  }
-
-  private stopAuthPolling(): void {
-    if (this.authPoll) {
-      clearTimeout(this.authPoll)
-      this.authPoll = null
-    }
   }
 
   // -------------------------------------------------------------- delivery
@@ -498,11 +458,33 @@ export class Controller implements vscode.Disposable {
 
   private async onTick(): Promise<void> {
     this.evaluate()
-    await this.retrySignInIfOffline()
+    if (this.config.enabled && !this.signedIn && !this.signingIn) {
+      // A key is stored but the last verification failed offline: retry quietly.
+      if (await this.store.getAccessToken()) await this.ensureSignedIn()
+    }
     if (!this.lastDecision.allowed) return
     if (Date.now() < this.nextFetchNotBefore) return
     await this.fetchNextAd()
     await this.batcher.flush()
+  }
+
+  /** Active editor time while focused, sent about once a minute. */
+  private async onHeartbeat(): Promise<void> {
+    if (!this.config.enabled || !this.signedIn || !eventsAllowed(this.config))
+      return
+    if (!vscode.window.state.focused || this.focusedSince === null) return
+    const seconds = Math.min(
+      600,
+      Math.round((Date.now() - this.focusedSince) / 1000)
+    )
+    this.focusedSince = Date.now()
+    if (seconds <= 0) return
+    try {
+      await this.api.heartbeat(seconds)
+      this.setOffline(false)
+    } catch (error) {
+      this.handleApiError(error, "send heartbeat")
+    }
   }
 
   private async fetchNextAd(): Promise<void> {
@@ -544,7 +526,7 @@ export class Controller implements vscode.Disposable {
     const tracked = this.batcher.track("impression", adId)
     this.log(
       tracked
-        ? `Impression counted for ${adId} (${current.ad.reward_tokens} tokens pending).`
+        ? `Impression counted for ${adId} (${current.ad.reward_tokens} tokens).`
         : `Impression for ${adId} not reported: events are disabled.`
     )
     await this.batcher.flush()
@@ -553,33 +535,17 @@ export class Controller implements vscode.Disposable {
 
   // ---------------------------------------------------------------- helpers
 
-  private async refreshBalance(): Promise<void> {
+  private async refreshMe(): Promise<void> {
     if (!this.signedIn) return
     try {
-      const balance = await this.api.getBalance()
-      await this.store.setBalance(balance)
+      const me = await this.api.me()
+      this.me = me
+      await this.store.setMe(me)
       this.setOffline(false)
+      await this.syncContextKeys()
       this.changed()
     } catch (error) {
-      this.handleApiError(error, "refresh balance")
-    }
-  }
-
-  private async syncWallet(): Promise<void> {
-    if (!this.signedIn || !this.walletCache) return
-    try {
-      await this.api.linkWallet(this.walletCache)
-      await this.store.setWalletSyncPending(false)
-      this.setOffline(false)
-    } catch (error) {
-      if (error instanceof ApiRequestError) {
-        void vscode.window.showWarningMessage(`Vibefuel: ${error.message}`)
-        await this.store.setWalletAddress(null)
-        this.walletCache = null
-        return
-      }
-      await this.store.setWalletSyncPending(true)
-      this.handleApiError(error, "link wallet")
+      this.handleApiError(error, "refresh account")
     }
   }
 
@@ -588,18 +554,16 @@ export class Controller implements vscode.Disposable {
     this.config = readConfig()
     if (previous.apiBaseUrl !== this.config.apiBaseUrl) {
       this.log(
-        `API mode changed to ${this.config.apiBaseUrl ? "http" : "mock"}; signing out.`
+        `API changed to ${this.config.apiBaseUrl || "mock"}; signing out.`
       )
       this.rebuildApi()
       this.rebuildBatcher()
       await this.signOut()
+      await this.store.setCurrentAd(null)
     }
     if (previous.enabled !== this.config.enabled) {
       if (this.config.enabled) await this.ensureSignedIn()
-      else {
-        this.stopAuthPolling()
-        this.batcher.clear()
-      }
+      else this.batcher.clear()
     }
     await this.syncContextKeys()
     this.evaluate()
@@ -632,10 +596,15 @@ export class Controller implements vscode.Disposable {
       isEnabled: () => this.config.enabled && eventsAllowed(this.config),
       onFlushed: (result) => {
         this.setOffline(false)
-        if (result.balance) {
-          void this.store.setBalance(result.balance).then(() => this.changed())
+        if (this.me) {
+          this.me = {
+            ...this.me,
+            balance: result.balance,
+            earned: this.me.earned + result.rewarded,
+          }
+          void this.store.setMe(this.me).then(() => this.changed())
         } else {
-          void this.refreshBalance()
+          void this.refreshMe()
         }
       },
       onError: (error) => this.handleApiError(error, "send events"),
@@ -644,7 +613,7 @@ export class Controller implements vscode.Disposable {
 
   private handleApiError(error: unknown, action: string): void {
     if (error instanceof UnauthorizedError) {
-      this.log(`Device token rejected while trying to ${action}; signing out.`)
+      this.log(`Serial key rejected while trying to ${action}; signing out.`)
       void this.signOut()
       return
     }
@@ -653,9 +622,7 @@ export class Controller implements vscode.Disposable {
       this.log(`Offline while trying to ${action}: ${error.message}`)
       return
     }
-    this.log(
-      `Failed to ${action}: ${error instanceof Error ? error.message : String(error)}`
-    )
+    this.log(`Failed to ${action}: ${describe(error)}`)
   }
 
   private setOffline(offline: boolean): void {
@@ -677,6 +644,11 @@ export class Controller implements vscode.Disposable {
     )
     await vscode.commands.executeCommand(
       "setContext",
+      "vibefuel.signedIn",
+      this.signedIn
+    )
+    await vscode.commands.executeCommand(
+      "setContext",
       "vibefuel.walletLinked",
       this.walletLinked
     )
@@ -689,4 +661,8 @@ export class Controller implements vscode.Disposable {
   private log(line: string): void {
     this.host.output.appendLine(`${new Date().toISOString()} ${line}`)
   }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
