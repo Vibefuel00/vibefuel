@@ -1,0 +1,19 @@
+0 verbose cli /opt/homebrew/Cellar/node/26.8.1/bin/node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.19.0
+2 info using node@v26.8.1
+3 silly config load:file:/opt/homebrew/lib/node_modules/npm/npmrc
+4 info config found workspace root at /Users/yazidkherrati/Desktop/code-earn
+5 silly config load:file:/Users/yazidkherrati/Desktop/code-earn/.npmrc
+6 silly config load:file:/Users/yazidkherrati/.npmrc
+7 silly config load:file:/opt/homebrew/etc/npmrc
+8 verbose title npm exec tsc --noEmit -p tsconfig.json
+9 verbose argv "exec" "--" "tsc" "--noEmit" "-p" "tsconfig.json"
+10 verbose logfile logs-max:10 dir:/Users/yazidkherrati/Desktop/code-earn/apps/claude-code/.npm-cache/_logs/2026-10-01T00_26_22_663Z-
+11 verbose logfile /Users/yazidkherrati/Desktop/code-earn/apps/claude-code/.npm-cache/_logs/2026-10-01T00_26_22_663Z-debug-0.log
+12 silly logfile done cleaning log files
+13 verbose cwd /Users/yazidkherrati/Desktop/code-earn/apps/claude-code
+14 verbose os Darwin 25.6.0
+15 verbose node v26.8.1
+16 verbose npm  v11.19.0
+17 verbose exit 0
+18 info ok

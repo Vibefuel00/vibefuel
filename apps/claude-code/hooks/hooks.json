@@ -1,0 +1,27 @@
+{
+  "description": "Vibefuel: records session start for the quiet period and shows one labelled sponsored line after a task finishes. Nothing runs until /vibefuel:optin.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/vibefuel.cjs\" hook session-start",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/vibefuel.cjs\" hook stop",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

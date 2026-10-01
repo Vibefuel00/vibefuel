@@ -1,0 +1,23 @@
+{
+  "name": "vibefuel",
+  "owner": {
+    "name": "Vibefuel",
+    "url": "https://vibefuel.app"
+  },
+  "metadata": {
+    "description": "Vibefuel plugins for terminal agents. See sponsored messages between tasks and earn Solana tokens toward your next AI credits."
+  },
+  "plugins": [
+    {
+      "name": "vibefuel",
+      "source": "./apps/claude-code",
+      "description": "A short, clearly labelled sponsored line after a task finishes, never mid-task. Earn Solana tokens on the same balance as the Vibefuel editor extension.",
+      "version": "0.1.0",
+      "author": { "name": "Vibefuel", "url": "https://vibefuel.app" },
+      "homepage": "https://vibefuel.app",
+      "license": "MIT",
+      "keywords": ["vibefuel", "solana", "rewards", "sponsored"],
+      "category": "productivity"
+    }
+  ]
+}

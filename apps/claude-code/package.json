@@ -1,0 +1,26 @@
+{
+  "name": "vibefuel-claude-code",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vibefuel plugin for Claude Code: a labelled sponsored line after a task finishes, status line balance, and the same Solana token balance as the editor extension.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test",
+    "test": "npm run build && vitest run",
+    "format": "prettier --write \"**/*.{ts,mjs,mts,json,md}\""
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@workspace/vibefuel-core": "*",
+    "esbuild": "^0.28.2",
+    "eslint": "^10",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "typescript": "^5",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}
