@@ -50,6 +50,30 @@ describe("validateAd", () => {
     expect(validateAd({ ...base, reward_tokens: "5" }, NOW)).toBeNull()
   })
 
+  it("keeps optional branding fields and drops bad ones", () => {
+    const out = validateAd(
+      {
+        ...base,
+        domain: "example.com",
+        logo_url: "https://x.test/l.png",
+        brand_bg: "#0A0A0A",
+        brand_fg: "#ffffff",
+      },
+      NOW
+    )
+    expect(out).toMatchObject({
+      domain: "example.com",
+      logo_url: "https://x.test/l.png",
+      brand_bg: "#0a0a0a",
+    })
+    expect(
+      validateAd({ ...base, brand_bg: "red" }, NOW)?.brand_bg
+    ).toBeUndefined()
+    expect(
+      validateAd({ ...base, logo_url: "http://x.test/l.png" }, NOW)
+    ).toBeNull()
+  })
+
   it("every mock ad passes validation", () => {
     const ads = JSON.parse(
       readFileSync(path.resolve(process.cwd(), "data/mock-ads.json"), "utf8")

@@ -3,19 +3,15 @@ import {
   ApiRequestError,
   ApiUnavailableError,
   UnauthorizedError,
-  type PollResult,
   type TokenSource,
   type VibefuelApi,
 } from "./client"
 import type {
   Ad,
   AdEvent,
-  Balance,
   ClientInfo,
-  DeviceAuthResponse,
-  DeviceTokenPending,
-  DeviceTokenResponse,
   EventBatchResult,
+  Me,
   Wallet,
 } from "./types"
 
@@ -45,77 +41,63 @@ export class HttpAdapter implements VibefuelApi {
     this.timeoutMs = options.timeoutMs ?? HTTP_TIMEOUT_MS
   }
 
-  async startDeviceAuth(): Promise<DeviceAuthResponse> {
-    const res = await this.request("POST", "/v1/auth/device", {
-      body: { client: this.client },
-      auth: false,
-    })
-    return (await res.json()) as DeviceAuthResponse
+  async me(): Promise<Me> {
+    const res = await this.request("GET", "/api/ext/me")
+    return (await res.json()) as Me
   }
 
-  async pollDeviceToken(deviceCode: string): Promise<PollResult> {
-    const res = await this.request("POST", "/v1/auth/token", {
-      body: { device_code: deviceCode },
-      auth: false,
-      allow: [400],
+  async heartbeat(activeSeconds: number): Promise<void> {
+    await this.request("POST", "/api/ext/heartbeat", {
+      body: {
+        editor: this.client.editor,
+        extension_version: this.client.extension_version,
+        active_seconds: Math.max(0, Math.min(600, Math.floor(activeSeconds))),
+      },
     })
-    if (res.status === 400) {
-      const pending = (await res.json()) as DeviceTokenPending
-      return { status: "pending", error: pending.error }
-    }
-    return { status: "ok", token: (await res.json()) as DeviceTokenResponse }
   }
 
   async getNextAd(sessionId: string): Promise<Ad | null> {
-    const query = new URLSearchParams({
-      session_id: sessionId,
-      editor: this.client.editor,
-    })
-    const res = await this.request("GET", `/v1/ads/next?${query.toString()}`)
+    const query = new URLSearchParams({ session_id: sessionId })
+    if (this.client.surface) query.set("surface", this.client.surface)
+    const res = await this.request(
+      "GET",
+      `/api/ext/ads/next?${query.toString()}`
+    )
     if (res.status === 204) return null
     return (await res.json()) as Ad
   }
 
   async postEvents(events: AdEvent[]): Promise<EventBatchResult> {
-    const res = await this.request("POST", "/v1/events", {
+    const res = await this.request("POST", "/api/ext/events", {
       body: { events, client: this.client },
     })
     return (await res.json()) as EventBatchResult
   }
 
-  async getBalance(): Promise<Balance> {
-    const res = await this.request("GET", "/v1/rewards/balance")
-    return (await res.json()) as Balance
-  }
-
   async linkWallet(address: string): Promise<Wallet> {
-    const res = await this.request("POST", "/v1/wallet", {
+    const res = await this.request("POST", "/api/ext/wallet", {
       body: { address },
     })
     return (await res.json()) as Wallet
   }
 
   async unlinkWallet(): Promise<void> {
-    await this.request("DELETE", "/v1/wallet")
+    await this.request("DELETE", "/api/ext/wallet")
   }
 
   private async request(
     method: string,
     path: string,
-    options: { body?: unknown; auth?: boolean; allow?: number[] } = {}
+    options: { body?: unknown; allow?: number[] } = {}
   ): Promise<Response> {
     const headers: Record<string, string> = {
       Accept: "application/json",
       "X-Vibefuel-Client": `${this.client.editor}/${this.client.editor_version} vibefuel/${this.client.extension_version}`,
     }
-    if (options.body !== undefined) {
-      headers["Content-Type"] = "application/json"
-    }
-    if (options.auth !== false) {
-      const token = await this.tokens.getToken()
-      if (!token) throw new UnauthorizedError()
-      headers.Authorization = `Bearer ${token}`
-    }
+    if (options.body !== undefined) headers["Content-Type"] = "application/json"
+    const token = await this.tokens.getToken()
+    if (!token) throw new UnauthorizedError()
+    headers.Authorization = `Bearer ${token}`
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.timeoutMs)
@@ -140,7 +122,7 @@ export class HttpAdapter implements VibefuelApi {
     try {
       const body = (await res.json()) as { error?: string; message?: string }
       code = body.error ?? code
-      message = body.message ?? message
+      message = body.message ?? body.error ?? message
     } catch {
       // Body was not JSON; keep the defaults.
     }

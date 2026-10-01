@@ -1,19 +1,6 @@
-import type {
-  Ad,
-  AdEvent,
-  Balance,
-  DeviceAuthResponse,
-  DeviceTokenPending,
-  DeviceTokenResponse,
-  EventBatchResult,
-  Wallet,
-} from "./types"
+import type { Ad, AdEvent, EventBatchResult, Me, Wallet } from "./types"
 
 export type ApiMode = "mock" | "http"
-
-export type PollResult =
-  | { status: "ok"; token: DeviceTokenResponse }
-  | { status: "pending"; error: DeviceTokenPending["error"] }
 
 /** Thrown when the API cannot be reached or answers with a server error. */
 export class ApiUnavailableError extends Error {
@@ -29,7 +16,7 @@ export class ApiUnavailableError extends Error {
 /** Thrown on 401; the caller signs the device out. */
 export class UnauthorizedError extends Error {
   constructor() {
-    super("Device token rejected")
+    super("Serial key rejected")
     this.name = "UnauthorizedError"
   }
 }
@@ -48,20 +35,20 @@ export class ApiRequestError extends Error {
 
 /**
  * One interface, two adapters. `MockAdapter` serves fictional ads from a local
- * file; `HttpAdapter` talks to the OpenAPI contract in `api/openapi.yaml`.
+ * list; `HttpAdapter` talks to the contract in `api/openapi.yaml`.
  */
 export interface VibefuelApi {
   readonly mode: ApiMode
-  startDeviceAuth(): Promise<DeviceAuthResponse>
-  pollDeviceToken(deviceCode: string): Promise<PollResult>
+  /** Verifies the key and returns the account summary. */
+  me(): Promise<Me>
+  heartbeat(activeSeconds: number): Promise<void>
   getNextAd(sessionId: string): Promise<Ad | null>
   postEvents(events: AdEvent[]): Promise<EventBatchResult>
-  getBalance(): Promise<Balance>
   linkWallet(address: string): Promise<Wallet>
   unlinkWallet(): Promise<void>
 }
 
-/** Provides the bearer token for HTTP requests. */
+/** Provides the serial key for HTTP requests. */
 export interface TokenSource {
   getToken(): Promise<string | undefined>
 }

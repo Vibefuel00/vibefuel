@@ -17,6 +17,16 @@ export function isHttpsUrl(value: unknown): value is string {
   }
 }
 
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" || url.protocol === "http:"
+  } catch {
+    return false
+  }
+}
+
 /**
  * Validate an ad from either adapter before it reaches the webview. Anything
  * that violates the format is dropped rather than rendered partially.
@@ -42,7 +52,20 @@ export function validateAd(input: unknown, now = Date.now()): Ad | null {
 
   if (!isHttpsUrl(ad.cta_url)) return null
   if (ad.image_url !== undefined && !isHttpsUrl(ad.image_url)) return null
-  if (ad.click_url !== undefined && !isHttpsUrl(ad.click_url)) return null
+  // click_url is minted by the configured API host, so a local http server is fine.
+  if (ad.click_url !== undefined && !isHttpUrl(ad.click_url)) return null
+  if (ad.logo_url !== undefined && !isHttpsUrl(ad.logo_url)) return null
+  const HEX = /^#[0-9a-fA-F]{6}$/
+  const hex = (key: "brand_bg" | "brand_fg"): string | undefined =>
+    typeof ad[key] === "string" && HEX.test(ad[key])
+      ? ad[key].toLowerCase()
+      : undefined
+  const domain =
+    typeof ad.domain === "string" &&
+    ad.domain.trim().length > 0 &&
+    ad.domain.length <= 80
+      ? ad.domain.trim()
+      : undefined
 
   const reward = ad.reward_tokens
   if (typeof reward !== "number" || !Number.isFinite(reward) || reward < 0) {
@@ -65,5 +88,11 @@ export function validateAd(input: unknown, now = Date.now()): Ad | null {
   }
   if (ad.image_url !== undefined) result.image_url = ad.image_url
   if (ad.click_url !== undefined) result.click_url = ad.click_url
+  if (ad.logo_url !== undefined) result.logo_url = ad.logo_url
+  const brand_bg = hex("brand_bg")
+  const brand_fg = hex("brand_fg")
+  if (brand_bg) result.brand_bg = brand_bg
+  if (brand_fg) result.brand_fg = brand_fg
+  if (domain) result.domain = domain
   return result
 }

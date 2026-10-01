@@ -1,108 +1,100 @@
 openapi: 3.1.0
 info:
-  title: Vibefuel Device API
-  version: 1.0.0
-  summary: Contract between the Vibefuel editor extension and the Vibefuel backend.
+  title: Vibefuel Extension API
+  version: 2.0.0
+  summary: Contract between the Vibefuel clients (VS Code extension, Claude Code plugin) and the Vibefuel web app.
   description: |
-    The extension authenticates a device with an OAuth-style device code flow,
-    then fetches sponsored messages, reports ad events in batches, reads the
-    token balance and links or unlinks a Solana public address.
+    The web app at vibefuel.app serves this API. A developer creates a serial
+    key on the site (no email, no password) and pastes it into a client. Every
+    request carries that key as a bearer token.
 
-    The backend does not exist yet. The extension ships a mock adapter that
-    implements this same contract locally. Every request from the extension
-    carries `X-Vibefuel-Client` (editor name, editor version, extension version)
-    and, once authenticated, a bearer device token.
+    Clients fetch sponsored messages, report ad events in batches, send a
+    heartbeat with active editor time, read the balance and link a Solana
+    public address. The extension ships a mock adapter that implements this
+    same contract locally.
   license:
     name: MIT
     identifier: MIT
 servers:
-  - url: "{baseUrl}"
-    description: Configured by the user via the `vibefuel.apiBaseUrl` setting.
-    variables:
-      baseUrl:
-        default: http://localhost:8787
+  - url: https://vibefuel.app
+    description: Production.
+  - url: http://localhost:3000
+    description: Local development (`npm run dev` in apps/web).
 tags:
-  - name: auth
+  - name: account
   - name: ads
   - name: events
-  - name: rewards
   - name: wallet
 security:
-  - deviceToken: []
+  - serialKey: []
 paths:
-  /v1/auth/device:
-    post:
-      tags: [auth]
-      operationId: startDeviceAuth
-      summary: Start the device code flow.
-      description: Returns a device code to poll with and a short user code to show the developer.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DeviceAuthRequest"
+  /api/ext/me:
+    get:
+      tags: [account]
+      operationId: getMe
+      summary: Account summary for the key. Also verifies the key on sign-in.
       responses:
         "200":
-          description: Device code issued.
+          description: The developer behind this key.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeviceAuthResponse"
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
-  /v1/auth/token:
+  /api/ext/heartbeat:
     post:
-      tags: [auth]
-      operationId: pollDeviceToken
-      summary: Exchange a device code for a device token.
+      tags: [account]
+      operationId: heartbeat
+      summary: Report active editor time.
       description: |
-        Poll at the interval returned by `startDeviceAuth`. While the developer
-        has not finished in the browser, the server answers `400` with error
-        `authorization_pending`. `slow_down` asks the client to add 5 seconds
-        to the polling interval. `expired_token` means the flow must restart.
-      security: []
+        Sent about once a minute while the editor window is focused and
+        Vibefuel is on. `active_seconds` is the focused time since the previous
+        heartbeat, capped at 600. The site aggregates it per UTC day and shows
+        it as hours of work. Rate limit 30 per minute.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DeviceTokenRequest"
+              $ref: "#/components/schemas/Heartbeat"
       responses:
         "200":
-          description: Device token issued.
+          description: Recorded.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeviceTokenResponse"
-        "400":
-          description: Not ready yet, or the device code is no longer valid.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DeviceTokenPending"
+                $ref: "#/components/schemas/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
-  /v1/ads/next:
+  /api/ext/ads/next:
     get:
       tags: [ads]
       operationId: getNextAd
-      summary: Return the next eligible sponsored message for this device.
+      summary: Return the next eligible sponsored message for this developer.
+      description: |
+        A campaign is eligible when it is live, has budget left and this
+        developer has not had a rewarded impression of it in the last 6 hours.
+        The client applies its own frequency and quiet period on top.
       parameters:
         - name: session_id
           in: query
           required: true
           schema:
             type: string
-        - name: editor
+        - name: surface
           in: query
           required: false
-          description: Editor name, e.g. `vscode` or `cursor`. Used for targeting and nothing else.
           schema:
-            type: string
+            $ref: "#/components/schemas/Surface"
       responses:
         "200":
           description: An eligible ad.
@@ -111,21 +103,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ad"
         "204":
-          description: No eligible ad right now. The client keeps its own frequency policy.
+          description: No eligible ad right now.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
-  /v1/events:
+  /api/ext/events:
     post:
       tags: [events]
       operationId: postEvents
       summary: Report a batch of ad events.
       description: |
-        The extension batches events and sends at most one request per minute.
-        Events are idempotent on `id`, so a retried batch never double counts.
+        At most 100 events per request and at most one request per minute per
+        client. Events are idempotent on `id`, so a retried batch never double
+        counts. The server pays an impression reward at most once per campaign
+        per developer per 6 hours and never beyond the campaign budget.
       requestBody:
         required: true
         content:
@@ -133,81 +127,30 @@ paths:
             schema:
               $ref: "#/components/schemas/EventBatch"
       responses:
-        "202":
-          description: Batch accepted.
+        "200":
+          description: Batch processed.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventBatchResult"
+        "400":
+          description: Malformed batch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/RateLimited"
         default:
           $ref: "#/components/responses/Error"
-  /v1/go/{ad_id}:
-    get:
-      tags: [events]
-      operationId: clickRedirect
-      summary: Record a click and redirect to the advertiser.
-      description: |
-        Used by terminal surfaces where a link is printed as text. The device
-        token travels in the `t` query parameter because browsers do not send
-        headers for a plain link. The server records a `click` event and
-        answers with a 302 to the ad's `cta_url`.
-      security: []
-      parameters:
-        - name: ad_id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: t
-          in: query
-          required: true
-          description: Device token.
-          schema:
-            type: string
-        - name: s
-          in: query
-          required: false
-          description: Session id.
-          schema:
-            type: string
-      responses:
-        "302":
-          description: Redirect to the advertiser's `cta_url`.
-          headers:
-            Location:
-              schema:
-                type: string
-                format: uri
-        "404":
-          description: Unknown ad.
-        default:
-          $ref: "#/components/responses/Error"
-  /v1/rewards/balance:
-    get:
-      tags: [rewards]
-      operationId: getBalance
-      summary: Return pending and settled token balances.
-      responses:
-        "200":
-          description: Current balances.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Balance"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        default:
-          $ref: "#/components/responses/Error"
-  /v1/wallet:
+  /api/ext/wallet:
     post:
       tags: [wallet]
       operationId: linkWallet
-      summary: Link a Solana public address to the account.
-      description: Only a public address is ever sent. Private keys and seed phrases never leave the developer's machine, and the extension never asks for them.
+      summary: Link a Solana public address for payouts.
+      description: Only a public address is ever sent. Private keys and seed phrases never leave the developer's machine, and the clients never ask for them.
       requestBody:
         required: true
         content:
@@ -222,7 +165,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Wallet"
         "400":
-          description: The address is not a valid Solana public key.
+          description: Not a valid Solana public key.
           content:
             application/json:
               schema:
@@ -242,26 +185,56 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         default:
           $ref: "#/components/responses/Error"
+  /api/go/{ad_id}:
+    get:
+      tags: [events]
+      operationId: clickRedirect
+      summary: Record a click and redirect to the advertiser.
+      description: |
+        Used by terminal surfaces where a link is printed as text. `t` is a
+        short-lived token minted by the server when the ad was served, bound to
+        the developer and the campaign, so the serial key never appears in a
+        link. The server records a `click` event once per token and answers
+        with a 302 to the campaign URL.
+      security: []
+      parameters:
+        - name: ad_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: t
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the advertiser's URL.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        "404":
+          description: Unknown ad or invalid token.
+        default:
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
-    deviceToken:
+    serialKey:
       type: http
       scheme: bearer
-      description: Device token issued by `POST /v1/auth/token`.
+      description: The developer's serial key, `VF-XXXX-XXXX-XXXX-XXXX`, created on vibefuel.app.
   responses:
     Unauthorized:
-      description: Missing, expired or revoked device token. The extension signs the device out.
+      description: Missing, malformed or unknown serial key. The client signs out.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     RateLimited:
-      description: Too many requests. Honor `Retry-After`.
-      headers:
-        Retry-After:
-          schema:
-            type: integer
-            description: Seconds to wait before retrying.
+      description: Too many requests. Back off until the next tick.
       content:
         application/json:
           schema:
@@ -273,91 +246,80 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
   schemas:
+    Surface:
+      type: string
+      enum: [sidebar, terminal]
+      description: |
+        Where the ad is rendered. `sidebar` impressions require 3 seconds of
+        focused visibility; `terminal` impressions count on display.
     ClientInfo:
       type: object
-      description: The only environment data the extension collects.
+      description: The only environment data the clients collect.
       required: [editor, editor_version, extension_version]
       properties:
         editor:
           type: string
           description: Client application name, e.g. `Visual Studio Code`, `Cursor` or `Claude Code`.
           maxLength: 80
-        surface:
-          type: string
-          enum: [sidebar, terminal]
-          description: |
-            Where the ad is rendered. `sidebar` impressions require 3 seconds
-            of focused visibility; `terminal` impressions count on display.
         editor_version:
           type: string
           maxLength: 40
         extension_version:
           type: string
           maxLength: 40
-    DeviceAuthRequest:
+        surface:
+          $ref: "#/components/schemas/Surface"
+    Heartbeat:
       type: object
-      required: [client]
+      required: [editor, extension_version, active_seconds]
       properties:
-        client:
-          $ref: "#/components/schemas/ClientInfo"
-    DeviceAuthResponse:
-      type: object
-      required: [device_code, user_code, verification_uri, expires_in, interval]
-      properties:
-        device_code:
+        editor:
           type: string
-          description: Opaque code the extension polls with. Never shown to the developer.
-        user_code:
+          maxLength: 80
+        extension_version:
           type: string
-          description: Short human-readable code shown in the sidebar, e.g. `FUEL-4K7Q`.
-          maxLength: 16
-        verification_uri:
-          type: string
-          format: uri
-          description: Page where the developer enters the user code. Must be https.
-        verification_uri_complete:
-          type: string
-          format: uri
-          description: Optional variant with the user code pre-filled.
-        expires_in:
+          maxLength: 40
+        active_seconds:
           type: integer
-          description: Seconds until the device code expires.
-        interval:
+          minimum: 0
+          maximum: 600
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true
+    Me:
+      type: object
+      required:
+        [
+          developer_id,
+          key_prefix,
+          wallet_address,
+          balance,
+          earned,
+          active_seconds,
+        ]
+      properties:
+        developer_id:
+          type: string
+        key_prefix:
+          type: string
+          description: First characters of the key, e.g. `VF-7K2M`, for display.
+        wallet_address:
+          type: ["string", "null"]
+        balance:
+          $ref: "#/components/schemas/Balance"
+        earned:
+          type: number
+          description: Tokens earned all time.
+        active_seconds:
           type: integer
-          description: Minimum seconds between polls.
-    DeviceTokenRequest:
-      type: object
-      required: [device_code]
-      properties:
-        device_code:
-          type: string
-    DeviceTokenResponse:
-      type: object
-      required: [access_token, token_type, device_id]
-      properties:
-        access_token:
-          type: string
-        token_type:
-          type: string
-          const: Bearer
-        expires_in:
-          type: integer
-          description: Seconds until the token expires. Omitted means it does not expire.
-        device_id:
-          type: string
-          description: Anonymous device id assigned by the server.
-    DeviceTokenPending:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: string
-          enum: [authorization_pending, slow_down, expired_token, access_denied]
-        error_description:
-          type: string
+          description: Active editor time all time, from heartbeats.
     Ad:
       type: object
-      description: One sponsored message. Rendered only inside the Vibefuel sidebar view.
+      description: One sponsored message. Rendered only inside the Vibefuel sidebar view or as one labelled terminal line.
       required:
         [
           id,
@@ -372,9 +334,14 @@ components:
       properties:
         id:
           type: string
+          description: Campaign id.
         advertiser:
           type: string
           maxLength: 40
+        domain:
+          type: string
+          maxLength: 80
+          description: Advertiser domain shown next to the name.
         headline:
           type: string
           maxLength: 60
@@ -394,14 +361,24 @@ components:
           format: uri
           pattern: "^https://"
           description: Optional 16:9 image.
+        logo_url:
+          type: string
+          format: uri
+          pattern: "^https://"
+          description: Optional square logo.
+        brand_bg:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          description: Card background set by the advertiser.
+        brand_fg:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          description: Card text color set by the advertiser.
         click_url:
           type: string
           format: uri
           pattern: "^https://"
-          description: |
-            Optional tracked link (`GET /v1/go/{ad_id}`) for surfaces that
-            cannot send a click event themselves, such as a terminal. Clients
-            that do send click events open `cta_url` directly.
+          description: Tracked link (`GET /api/go/{ad_id}`) for surfaces that cannot send a click event.
         reward_tokens:
           type: number
           minimum: 0
@@ -419,8 +396,10 @@ components:
         id:
           type: string
           description: Client-generated UUID used for idempotency.
+          maxLength: 80
         ad_id:
           type: string
+          description: Campaign id from the served ad.
         type:
           $ref: "#/components/schemas/AdEventType"
         occurred_at:
@@ -435,18 +414,21 @@ components:
       properties:
         events:
           type: array
-          maxItems: 200
+          maxItems: 100
           items:
             $ref: "#/components/schemas/AdEvent"
         client:
           $ref: "#/components/schemas/ClientInfo"
     EventBatchResult:
       type: object
-      required: [accepted]
+      required: [accepted, rewarded, balance]
       properties:
         accepted:
           type: integer
-          description: Number of events accepted, including duplicates that were ignored.
+          description: Events stored, excluding duplicates.
+        rewarded:
+          type: integer
+          description: Tokens credited by this batch.
         balance:
           $ref: "#/components/schemas/Balance"
     Balance:
@@ -455,10 +437,10 @@ components:
       properties:
         pending:
           type: number
-          description: Tokens credited but not yet settled on-chain.
+          description: Tokens available, not yet paid out.
         settled:
           type: number
-          description: Tokens settled to the linked wallet, or held until one is linked.
+          description: Tokens already paid out to the linked wallet.
         currency:
           type: string
           description: Token symbol.

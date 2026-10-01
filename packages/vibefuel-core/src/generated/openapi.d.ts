@@ -4,7 +4,24 @@
  */
 
 export interface paths {
-    "/v1/auth/device": {
+    "/api/ext/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Account summary for the key. Also verifies the key on sign-in. */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ext/heartbeat": {
         parameters: {
             query?: never;
             header?: never;
@@ -14,47 +31,32 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start the device code flow.
-         * @description Returns a device code to poll with and a short user code to show the developer.
+         * Report active editor time.
+         * @description Sent about once a minute while the editor window is focused and
+         *     Vibefuel is on. `active_seconds` is the focused time since the previous
+         *     heartbeat, capped at 600. The site aggregates it per UTC day and shows
+         *     it as hours of work. Rate limit 30 per minute.
          */
-        post: operations["startDeviceAuth"];
+        post: operations["heartbeat"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/token": {
+    "/api/ext/ads/next": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Exchange a device code for a device token.
-         * @description Poll at the interval returned by `startDeviceAuth`. While the developer
-         *     has not finished in the browser, the server answers `400` with error
-         *     `authorization_pending`. `slow_down` asks the client to add 5 seconds
-         *     to the polling interval. `expired_token` means the flow must restart.
+         * Return the next eligible sponsored message for this developer.
+         * @description A campaign is eligible when it is live, has budget left and this
+         *     developer has not had a rewarded impression of it in the last 6 hours.
+         *     The client applies its own frequency and quiet period on top.
          */
-        post: operations["pollDeviceToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/ads/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Return the next eligible sponsored message for this device. */
         get: operations["getNextAd"];
         put?: never;
         post?: never;
@@ -64,7 +66,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/events": {
+    "/api/ext/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,8 +77,10 @@ export interface paths {
         put?: never;
         /**
          * Report a batch of ad events.
-         * @description The extension batches events and sends at most one request per minute.
-         *     Events are idempotent on `id`, so a retried batch never double counts.
+         * @description At most 100 events per request and at most one request per minute per
+         *     client. Events are idempotent on `id`, so a retried batch never double
+         *     counts. The server pays an impression reward at most once per campaign
+         *     per developer per 6 hours and never beyond the campaign budget.
          */
         post: operations["postEvents"];
         delete?: never;
@@ -85,7 +89,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/go/{ad_id}": {
+    "/api/ext/wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link a Solana public address for payouts.
+         * @description Only a public address is ever sent. Private keys and seed phrases never leave the developer's machine, and the clients never ask for them.
+         */
+        post: operations["linkWallet"];
+        /** Unlink the Solana public address. */
+        delete: operations["unlinkWallet"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/go/{ad_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -94,10 +119,11 @@ export interface paths {
         };
         /**
          * Record a click and redirect to the advertiser.
-         * @description Used by terminal surfaces where a link is printed as text. The device
-         *     token travels in the `t` query parameter because browsers do not send
-         *     headers for a plain link. The server records a `click` event and
-         *     answers with a 302 to the ad's `cta_url`.
+         * @description Used by terminal surfaces where a link is printed as text. `t` is a
+         *     short-lived token minted by the server when the ad was served, bound to
+         *     the developer and the campaign, so the serial key never appears in a
+         *     link. The server records a `click` event once per token and answers
+         *     with a 302 to the campaign URL.
          */
         get: operations["clickRedirect"];
         put?: never;
@@ -108,105 +134,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/rewards/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Return pending and settled token balances. */
-        get: operations["getBalance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/wallet": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Link a Solana public address to the account.
-         * @description Only a public address is ever sent. Private keys and seed phrases never leave the developer's machine, and the extension never asks for them.
-         */
-        post: operations["linkWallet"];
-        /** Unlink the Solana public address. */
-        delete: operations["unlinkWallet"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description The only environment data the extension collects. */
+        /**
+         * @description Where the ad is rendered. `sidebar` impressions require 3 seconds of
+         *     focused visibility; `terminal` impressions count on display.
+         * @enum {string}
+         */
+        Surface: "sidebar" | "terminal";
+        /** @description The only environment data the clients collect. */
         ClientInfo: {
             /** @description Client application name, e.g. `Visual Studio Code`, `Cursor` or `Claude Code`. */
             editor: string;
-            /**
-             * @description Where the ad is rendered. `sidebar` impressions require 3 seconds
-             *     of focused visibility; `terminal` impressions count on display.
-             * @enum {string}
-             */
-            surface?: "sidebar" | "terminal";
             editor_version: string;
             extension_version: string;
+            surface?: components["schemas"]["Surface"];
         };
-        DeviceAuthRequest: {
-            client: components["schemas"]["ClientInfo"];
+        Heartbeat: {
+            editor: string;
+            extension_version: string;
+            active_seconds: number;
         };
-        DeviceAuthResponse: {
-            /** @description Opaque code the extension polls with. Never shown to the developer. */
-            device_code: string;
-            /** @description Short human-readable code shown in the sidebar, e.g. `FUEL-4K7Q`. */
-            user_code: string;
-            /**
-             * Format: uri
-             * @description Page where the developer enters the user code. Must be https.
-             */
-            verification_uri: string;
-            /**
-             * Format: uri
-             * @description Optional variant with the user code pre-filled.
-             */
-            verification_uri_complete?: string;
-            /** @description Seconds until the device code expires. */
-            expires_in: number;
-            /** @description Minimum seconds between polls. */
-            interval: number;
-        };
-        DeviceTokenRequest: {
-            device_code: string;
-        };
-        DeviceTokenResponse: {
-            access_token: string;
+        Ok: {
             /** @constant */
-            token_type: "Bearer";
-            /** @description Seconds until the token expires. Omitted means it does not expire. */
-            expires_in?: number;
-            /** @description Anonymous device id assigned by the server. */
-            device_id: string;
+            ok: true;
         };
-        DeviceTokenPending: {
-            /** @enum {string} */
-            error: "authorization_pending" | "slow_down" | "expired_token" | "access_denied";
-            error_description?: string;
+        Me: {
+            developer_id: string;
+            /** @description First characters of the key, e.g. `VF-7K2M`, for display. */
+            key_prefix: string;
+            wallet_address: string | null;
+            balance: components["schemas"]["Balance"];
+            /** @description Tokens earned all time. */
+            earned: number;
+            /** @description Active editor time all time, from heartbeats. */
+            active_seconds: number;
         };
-        /** @description One sponsored message. Rendered only inside the Vibefuel sidebar view. */
+        /** @description One sponsored message. Rendered only inside the Vibefuel sidebar view or as one labelled terminal line. */
         Ad: {
+            /** @description Campaign id. */
             id: string;
             advertiser: string;
+            /** @description Advertiser domain shown next to the name. */
+            domain?: string;
             headline: string;
             body: string;
             cta_label: string;
@@ -222,9 +194,16 @@ export interface components {
             image_url?: string;
             /**
              * Format: uri
-             * @description Optional tracked link (`GET /v1/go/{ad_id}`) for surfaces that
-             *     cannot send a click event themselves, such as a terminal. Clients
-             *     that do send click events open `cta_url` directly.
+             * @description Optional square logo.
+             */
+            logo_url?: string;
+            /** @description Card background set by the advertiser. */
+            brand_bg?: string;
+            /** @description Card text color set by the advertiser. */
+            brand_fg?: string;
+            /**
+             * Format: uri
+             * @description Tracked link (`GET /api/go/{ad_id}`) for surfaces that cannot send a click event.
              */
             click_url?: string;
             /** @description Tokens credited on a qualified impression. */
@@ -237,6 +216,7 @@ export interface components {
         AdEvent: {
             /** @description Client-generated UUID used for idempotency. */
             id: string;
+            /** @description Campaign id from the served ad. */
             ad_id: string;
             type: components["schemas"]["AdEventType"];
             /** Format: date-time */
@@ -249,14 +229,16 @@ export interface components {
             client: components["schemas"]["ClientInfo"];
         };
         EventBatchResult: {
-            /** @description Number of events accepted, including duplicates that were ignored. */
+            /** @description Events stored, excluding duplicates. */
             accepted: number;
-            balance?: components["schemas"]["Balance"];
+            /** @description Tokens credited by this batch. */
+            rewarded: number;
+            balance: components["schemas"]["Balance"];
         };
         Balance: {
-            /** @description Tokens credited but not yet settled on-chain. */
+            /** @description Tokens available, not yet paid out. */
             pending: number;
-            /** @description Tokens settled to the linked wallet, or held until one is linked. */
+            /** @description Tokens already paid out to the linked wallet. */
             settled: number;
             /** @description Token symbol. */
             currency: string;
@@ -278,7 +260,7 @@ export interface components {
         };
     };
     responses: {
-        /** @description Missing, expired or revoked device token. The extension signs the device out. */
+        /** @description Missing, malformed or unknown serial key. The client signs out. */
         Unauthorized: {
             headers: {
                 [name: string]: unknown;
@@ -287,10 +269,9 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Too many requests. Honor `Retry-After`. */
+        /** @description Too many requests. Back off until the next tick. */
         RateLimited: {
             headers: {
-                "Retry-After"?: number;
                 [name: string]: unknown;
             };
             content: {
@@ -314,33 +295,30 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    startDeviceAuth: {
+    getMe: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeviceAuthRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Device code issued. */
+            /** @description The developer behind this key. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceAuthResponse"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
-    pollDeviceToken: {
+    heartbeat: {
         parameters: {
             query?: never;
             header?: never;
@@ -349,28 +327,21 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DeviceTokenRequest"];
+                "application/json": components["schemas"]["Heartbeat"];
             };
         };
         responses: {
-            /** @description Device token issued. */
+            /** @description Recorded. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceTokenResponse"];
+                    "application/json": components["schemas"]["Ok"];
                 };
             };
-            /** @description Not ready yet, or the device code is no longer valid. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeviceTokenPending"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
@@ -378,8 +349,7 @@ export interface operations {
         parameters: {
             query: {
                 session_id: string;
-                /** @description Editor name, e.g. `vscode` or `cursor`. Used for targeting and nothing else. */
-                editor?: string;
+                surface?: components["schemas"]["Surface"];
             };
             header?: never;
             path?: never;
@@ -396,7 +366,7 @@ export interface operations {
                     "application/json": components["schemas"]["Ad"];
                 };
             };
-            /** @description No eligible ad right now. The client keeps its own frequency policy. */
+            /** @description No eligible ad right now. */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -421,8 +391,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Batch accepted. */
-            202: {
+            /** @description Batch processed. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -430,64 +400,17 @@ export interface operations {
                     "application/json": components["schemas"]["EventBatchResult"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            429: components["responses"]["RateLimited"];
-            default: components["responses"]["Error"];
-        };
-    };
-    clickRedirect: {
-        parameters: {
-            query: {
-                /** @description Device token. */
-                t: string;
-                /** @description Session id. */
-                s?: string;
-            };
-            header?: never;
-            path: {
-                ad_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Redirect to the advertiser's `cta_url`. */
-            302: {
-                headers: {
-                    Location?: string;
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unknown ad. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    getBalance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current balances. */
-            200: {
+            /** @description Malformed batch. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Balance"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
+            429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };
     };
@@ -513,7 +436,7 @@ export interface operations {
                     "application/json": components["schemas"]["Wallet"];
                 };
             };
-            /** @description The address is not a valid Solana public key. */
+            /** @description Not a valid Solana public key. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -543,6 +466,37 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    clickRedirect: {
+        parameters: {
+            query: {
+                t: string;
+            };
+            header?: never;
+            path: {
+                ad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the advertiser's URL. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ad or invalid token. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             default: components["responses"]["Error"];
         };
     };

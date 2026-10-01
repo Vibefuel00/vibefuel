@@ -14,7 +14,11 @@ function makeSink() {
       postEvents: (events: AdEvent[]): Promise<EventBatchResult> => {
         if (fail) return Promise.reject(new Error("offline"))
         batches.push(events)
-        return Promise.resolve({ accepted: events.length })
+        return Promise.resolve({
+          accepted: events.length,
+          rewarded: 0,
+          balance: { pending: 0, settled: 0, currency: "tokens" },
+        })
       },
     },
   }

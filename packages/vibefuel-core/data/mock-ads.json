@@ -8,7 +8,8 @@
     "cta_url": "https://example.com/quillstack",
     "image_url": "https://placehold.co/640x360/F4EBE3/EA580C.png?text=Quillstack",
     "reward_tokens": 12,
-    "expires_at": "2099-01-01T00:00:00Z"
+    "expires_at": "2099-01-01T00:00:00Z",
+    "domain": "example.com"
   },
   {
     "id": "mock-002",
@@ -18,7 +19,8 @@
     "cta_label": "See pricing",
     "cta_url": "https://example.com/orbital-cache",
     "reward_tokens": 8,
-    "expires_at": "2099-01-01T00:00:00Z"
+    "expires_at": "2099-01-01T00:00:00Z",
+    "domain": "example.com"
   },
   {
     "id": "mock-003",
@@ -29,7 +31,8 @@
     "cta_url": "https://example.com/pinecone-pixel",
     "image_url": "https://placehold.co/640x360/F4EBE3/000000.png?text=Pinecone+%26+Pixel",
     "reward_tokens": 10,
-    "expires_at": "2099-01-01T00:00:00Z"
+    "expires_at": "2099-01-01T00:00:00Z",
+    "domain": "example.com"
   },
   {
     "id": "mock-004",
@@ -39,7 +42,8 @@
     "cta_label": "Start free",
     "cta_url": "https://example.com/ledgerline",
     "reward_tokens": 15,
-    "expires_at": "2099-01-01T00:00:00Z"
+    "expires_at": "2099-01-01T00:00:00Z",
+    "domain": "example.com"
   },
   {
     "id": "mock-005",
@@ -50,6 +54,7 @@
     "cta_url": "https://example.com/nimbus-notebook",
     "image_url": "https://placehold.co/640x360/EA580C/F4EBE3.png?text=Nimbus",
     "reward_tokens": 20,
-    "expires_at": "2099-01-01T00:00:00Z"
+    "expires_at": "2099-01-01T00:00:00Z",
+    "domain": "example.com"
   }
 ]

@@ -39,7 +39,7 @@ describe("MockAdapter", () => {
     expect(lines.length).toBeGreaterThan(0)
   })
 
-  it("credits impressions once and settles them after ten minutes", async () => {
+  it("credits one impression per campaign per 6 hours and pays out after ten minutes", async () => {
     let now = 1_000_000
     const api = new MockAdapter(
       ads,
@@ -47,16 +47,38 @@ describe("MockAdapter", () => {
       { appendLine: () => {} },
       () => now
     )
-    const event = {
-      id: "e1",
+    const event = (id: string) => ({
+      id,
       ad_id: "mock-001",
       type: "impression" as const,
       occurred_at: new Date(now).toISOString(),
       session_id: "s",
-    }
-    const result = await api.postEvents([event, event])
-    expect(result.balance).toMatchObject({ pending: 12, settled: 0 })
+    })
+    const first = await api.postEvents([event("e1"), event("e1")])
+    expect(first).toMatchObject({
+      accepted: 1,
+      rewarded: 12,
+      balance: { pending: 12, settled: 0 },
+    })
+    const again = await api.postEvents([event("e2")])
+    expect(again).toMatchObject({ accepted: 1, rewarded: 0 })
     now += 11 * 60_000
-    expect(await api.getBalance()).toMatchObject({ pending: 0, settled: 12 })
+    expect((await api.me()).balance).toMatchObject({ pending: 0, settled: 12 })
+    now += 6 * 60 * 60_000
+    expect((await api.postEvents([event("e3")])).rewarded).toBe(12)
+  })
+
+  it("reports a mock account, heartbeat time and wallet", async () => {
+    const api = new MockAdapter(ads, memoryStorage(), { appendLine: () => {} })
+    await api.heartbeat(60)
+    await api.linkWallet("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+    const me = await api.me()
+    expect(me.key_prefix).toBe("VF-MOCK")
+    expect(me.active_seconds).toBe(60)
+    expect(me.wallet_address).toBe(
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    )
+    await api.unlinkWallet()
+    expect((await api.me()).wallet_address).toBeNull()
   })
 })
