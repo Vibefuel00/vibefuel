@@ -11,11 +11,8 @@ export function formatTokens(value: number): string {
  */
 export function formatSponsoredLine(ad: Ad): string {
   const link = ad.click_url ?? ad.cta_url
-  return [
-    `Sponsored · ${ad.advertiser}: ${ad.headline}`,
-    `${ad.body}`,
-    `${ad.cta_label}: ${link} · Earn ${formatTokens(ad.reward_tokens)} tokens · /vibefuel:pause to pause`,
-  ].join("\n")
+  const body = ad.body.endsWith(".") ? ad.body : `${ad.body}.`
+  return `Sponsored · ${ad.advertiser}: ${ad.headline} — ${body} ${ad.cta_label}: ${link} · Earn ${formatTokens(ad.reward_tokens)} tokens · /vibefuel:pause to pause`
 }
 
 export function formatBalance(balance: Balance | null): string {

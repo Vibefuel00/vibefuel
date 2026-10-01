@@ -724,11 +724,8 @@ function formatTokens(value) {
 }
 function formatSponsoredLine(ad) {
   const link = ad.click_url ?? ad.cta_url;
-  return [
-    `Sponsored \xB7 ${ad.advertiser}: ${ad.headline}`,
-    `${ad.body}`,
-    `${ad.cta_label}: ${link} \xB7 Earn ${formatTokens(ad.reward_tokens)} tokens \xB7 /vibefuel:pause to pause`
-  ].join("\n");
+  const body = ad.body.endsWith(".") ? ad.body : `${ad.body}.`;
+  return `Sponsored \xB7 ${ad.advertiser}: ${ad.headline} \u2014 ${body} ${ad.cta_label}: ${link} \xB7 Earn ${formatTokens(ad.reward_tokens)} tokens \xB7 /vibefuel:pause to pause`;
 }
 function formatBalance(balance) {
   if (!balance) return "0 tokens";
