@@ -315,7 +315,7 @@ export class Controller implements vscode.Disposable {
     }
     const value = await vscode.window.showInputBox({
       title: "Sign in to Vibefuel",
-      prompt: `Paste the serial key from ${LANDING_URL}. It links this editor to your dashboard.`,
+      prompt: `Paste the Vibefuel key from ${LANDING_URL}. It links this editor to your dashboard.`,
       placeHolder: "VF-XXXX-XXXX-XXXX-XXXX",
       ignoreFocusOut: true,
       password: true,
@@ -374,7 +374,7 @@ export class Controller implements vscode.Disposable {
     const value = await vscode.window.showInputBox({
       title: "Link Solana wallet",
       prompt:
-        "Paste your Solana public address. Never paste a private key or seed phrase; Vibefuel will never ask for one.",
+        "Paste your Solana public address (the address you share to receive funds).",
       placeHolder: "32 to 44 base58 characters",
       ignoreFocusOut: true,
       validateInput: (text) => {

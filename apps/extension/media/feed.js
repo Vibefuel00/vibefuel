@@ -63,7 +63,7 @@
   const PRIVACY = {
     collected: [
       "An anonymous device id",
-      "Your serial key, stored hashed on the server",
+      "Your Vibefuel key, stored hashed on the server",
       "Ad events: impression, click, dismiss",
       "A once-a-minute heartbeat while the window is focused: editor name, extension version, active seconds",
     ],
@@ -186,7 +186,7 @@
       children.push(
         el("p", {
           className: "small",
-          text: "Create a free serial key on vibefuel.app, then paste it here. No email, no password. The key links this editor to your dashboard.",
+          text: "Create a free Vibefuel key on vibefuel.app, then paste it here. No email, no password. The key links this editor to your dashboard.",
         }),
         el("div", { className: "row" }, [
           button(
@@ -401,7 +401,7 @@
             ]),
         el("p", {
           className: "small muted",
-          text: "Only a public address is stored. Vibefuel never asks for private keys or seed phrases.",
+          text: "Only a public receiving address is stored.",
         }),
       ])
     )

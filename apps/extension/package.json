@@ -1,7 +1,7 @@
 {
   "name": "vibefuel",
   "displayName": "Vibefuel",
-  "description": "See sponsored messages in your coding workflow and earn Solana tokens toward your next AI credits.",
+  "description": "Sponsored messages in a sidebar while you build. Earn rewards toward your next AI credits.",
   "version": "0.1.0",
   "publisher": "vibefuel",
   "license": "MIT",
@@ -11,13 +11,8 @@
     "color": "#F4EBE3",
     "theme": "light"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KhepriDev/code-earn.git",
-    "directory": "apps/extension"
-  },
   "bugs": {
-    "url": "https://github.com/KhepriDev/code-earn/issues"
+    "url": "https://vibefuel.app"
   },
   "homepage": "https://vibefuel.app",
   "engines": {
@@ -29,10 +24,10 @@
   ],
   "keywords": [
     "vibefuel",
-    "solana",
-    "rewards",
     "sponsored",
-    "ai coding"
+    "rewards",
+    "ai coding",
+    "productivity"
   ],
   "pricing": "Free",
   "main": "./dist/extension.js",
@@ -78,7 +73,7 @@
       },
       {
         "command": "vibefuel.signIn",
-        "title": "Sign In with Serial Key",
+        "title": "Sign In with Vibefuel Key",
         "category": "Vibefuel"
       },
       {

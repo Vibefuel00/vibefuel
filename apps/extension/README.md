@@ -10,12 +10,6 @@ injected into your editor, your chat, your completions or your terminal.
 > Vibefuel is an independent product. It is not affiliated with, endorsed by or
 > partnered with the makers of VS Code, Cursor or any AI assistant.
 
-![Feed view](docs/screenshots/feed.png)
-_Screenshot placeholder: the feed view with a sponsored card, earnings and wallet._
-
-![Status bar](docs/screenshots/status-bar.png)
-_Screenshot placeholder: the status bar item with balance and the new message dot._
-
 ## Install
 
 ### VS Code
@@ -41,7 +35,7 @@ both editors.
 1. **Opt in.** On first launch the Vibefuel view opens with a plain explanation
    of what is shown, collected and earned. Nothing runs until you click
    **Opt in**. Opting out is one click in the same view and clears all state.
-2. **Sign in with your key.** Create a free serial key at
+2. **Sign in with your Vibefuel key.** Create a free Vibefuel key at
    [vibefuel.app](https://vibefuel.app) (no email, no password) and paste it
    when the extension asks. The key is stored in your editor's secret storage
    and links this editor to your dashboard.
@@ -54,9 +48,8 @@ both editors.
    nothing is ever auto-opened. **Not interested** dismisses the card. The
    server rewards each advertiser at most once every 6 hours and only from a
    funded campaign budget.
-5. **Wallet.** Link a Solana public address to receive payouts. Vibefuel
-   validates the base58 address and sends only that public address to your
-   account. It never asks for, reads or stores private keys or seed phrases.
+5. **Payouts.** Link a Solana public address to receive payouts. Vibefuel
+   validates the address and sends only that public address to your account.
    Payouts start at 100 tokens from your dashboard.
 
 Tokens can be put toward your next AI credits. Vibefuel does not buy credits on
@@ -91,7 +84,7 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
 
 **Collected**
 
-- Your serial key, to tie events to your dashboard. Stored hashed on the server.
+- Your Vibefuel key, to tie events to your dashboard. Stored hashed on the server.
 - Ad events: impression, click and dismiss, each with the campaign id, a
   timestamp and a random per-session id
 - A heartbeat about once a minute while the editor window is focused: editor
@@ -118,17 +111,17 @@ The same summary is shown inside the extension under **What Vibefuel collects**.
   anywhere; they are written to the **Vibefuel** output channel. Card images
   still load from their https URL.
 - The full summary is at [vibefuel.app/privacy](https://vibefuel.app/privacy).
+- Source code: the Vibefuel repository is linked from the website.
 
 ## Mock mode and the API contract
 
-The backend is defined by [`packages/vibefuel-core/api/openapi.yaml`](../../packages/vibefuel-core/api/openapi.yaml)
-(OpenAPI 3.1). Client types are generated from it with `npm run generate:api`
+The backend is defined by `packages/vibefuel-core/api/openapi.yaml`
+(OpenAPI 3.1) in the Vibefuel repository. Client types are generated from it with `npm run generate:api`
 in that package. The adapters, delivery policy and validation live in the
 shared `@workspace/vibefuel-core` package so the Claude Code plugin uses the
 same code and the same balance. Two adapters implement one interface:
 
-- **MockAdapter** (`vibefuel.apiBaseUrl` = `mock`): serves five clearly fictional ads from
-  [`packages/vibefuel-core/data/mock-ads.json`](../../packages/vibefuel-core/data/mock-ads.json),
+- **MockAdapter** (`vibefuel.apiBaseUrl` = `mock`): serves five clearly fictional ads,
   keeps the balance locally and logs events to the Vibefuel output channel.
 - **HttpAdapter** (default, `https://vibefuel.app`): the web app in `apps/web`
   serves the contract. If the host cannot be reached the sidebar shows an
@@ -159,4 +152,4 @@ npx ovsx publish dist/*.vsix -p $OVSX_PAT   # Open VSX, used by Cursor
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License. The full text ships inside the extension package.
